@@ -1,12 +1,14 @@
 package xyz.rura.labs.io
 
+import scala.collection.mutable.ListBuffer
+
 class BufferOutput extends Map 
 {
-	private var out:VirtualFile = null
+	private var out:ListBuffer[VirtualFile] = ListBuffer[VirtualFile]()
 
 	def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = {
-		out = f
+		out += f
 	}
 
-	def file:VirtualFile = out
+	def buffer = out
 }
