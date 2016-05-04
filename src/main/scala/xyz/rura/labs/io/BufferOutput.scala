@@ -10,5 +10,5 @@ class BufferOutput extends Map
 		out += f
 	}
 
-	def buffer = out
+	def buffer = out.toList
 }
