@@ -15,4 +15,5 @@ libraryDependencies ++= Seq(
   "org.apache.httpcomponents" % "httpclient" % "4.5.2",
   "org.jsoup" % "jsoup" % "1.8.3",
   "com.typesafe.play" %% "play-json" % "2.5.0",
-  "commons-io" % "commons-io" % "2.4")
+  "commons-io" % "commons-io" % "2.4",
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0")

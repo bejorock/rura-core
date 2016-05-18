@@ -27,10 +27,10 @@ class AsyncStream(tmp:Future[Iterator[VirtualFile]]) extends Stream
 			mappers += Future{
 				m.map(i, (o:VirtualFile, e:Exception) => {
 					if(e != null) {
-						throw e
+						e.printStackTrace()
+					} else {
+						output += o
 					}
-
-					output += o
 				})
 
 				true
