@@ -4,6 +4,7 @@ import java.io._
 
 import scala.collection.mutable.ListBuffer
 import scala.io.Source
+import scala.concurrent.Promise
 
 object ConsoleStream 
 {
@@ -31,7 +32,7 @@ object ConsoleStream
 			}
 		}
 
-		return new BasicStream(vfs.toList)
+		return new AsyncStream(Promise.successful(vfs.iterator).future)
 	}
 
 	def src(labels:Array[String]):Stream = src(labels, Array[String]())

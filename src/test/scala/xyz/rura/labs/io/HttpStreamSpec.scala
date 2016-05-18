@@ -64,7 +64,7 @@ class HttpStreamSpec extends FlatSpec with Matchers
   	}
 
   	it should "write output" in {
-  		stream.pipe(HttpStream.dest("http://localhost/api/dummy.json", client))
+  		stream = stream.pipe(HttpStream.dest("http://localhost/api/dummy.json", client))
 
   		stream.isEnd should === (true)	
   	}

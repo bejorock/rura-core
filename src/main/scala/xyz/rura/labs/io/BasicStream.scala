@@ -19,19 +19,19 @@ class BasicStream(var input:List[VirtualFile]) extends Stream
 			output += o
 		})}
 
-		/*if(output.size > 0) {
+		if(output.size > 0) {
 			return new BasicStream(output.toList)
 		} else {
 			return new Stream() {
 				override def pipe(m:Map):Stream = throw new Exception("end of stream!!!")
 				override def isEnd:Boolean = true
 			}
-		}*/
+		}
 
-		input = output.toList
+		/*input = output.toList
 		output = ListBuffer[VirtualFile]()
 
-		return this
+		return this*/
 	}
 
 	override def isEnd:Boolean = input.size < 1

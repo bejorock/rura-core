@@ -5,6 +5,7 @@ import java.nio.file.FileSystems
 
 import scala.io.Source
 import scala.collection.JavaConversions._
+import scala.concurrent.Promise
 
 import org.apache.commons.io.IOUtils
 import org.apache.commons.io.FileUtils
@@ -31,7 +32,7 @@ object FileStream
 			override def inputstream = new FileInputStream(f)
 		}}
 
-		return new BasicStream(vfs.toList)
+		return new AsyncStream(Promise.successful(vfs.iterator).future)
 	}
 
 	def src(glob:String):Stream = src(Array(glob))

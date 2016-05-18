@@ -15,7 +15,7 @@ class ConsoleStreamSpec extends FlatSpec with Matchers
   	}
 
     it should "have content rana" in {
-        stream.pipe(new Map() {
+        stream = stream.pipe(new Map() {
             def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = {
                 Source.fromInputStream(f.inputstream).mkString should === ("rana")
 
@@ -25,7 +25,7 @@ class ConsoleStreamSpec extends FlatSpec with Matchers
     }
 
   	it should "write output" in {
-  		stream.pipe(ConsoleStream.dest)
+  		stream = stream.pipe(ConsoleStream.dest)
 
   		stream.isEnd should === (true)
   	}

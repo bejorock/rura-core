@@ -13,7 +13,7 @@ class FileStreamSpec extends FlatSpec with Matchers
 	}
 
 	it should "write output" in {
-		stream.pipe(FileStream.dest("tmp/dest/"))
+		stream = stream.pipe(FileStream.dest("tmp/dest/"))
 
 		stream.isEnd should === (true)
 	}

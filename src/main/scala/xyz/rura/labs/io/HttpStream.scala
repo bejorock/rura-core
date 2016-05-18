@@ -24,6 +24,7 @@ import org.apache.http.util.EntityUtils
 import org.apache.http.entity.ByteArrayEntity
 
 import scala.io.Source
+import scala.concurrent.Promise
 
 object HttpStream 
 {
@@ -58,7 +59,7 @@ object HttpStream
 			vf
 		}
 
-		return new BasicStream(vfs.toList)
+		return new AsyncStream(Promise.successful(vfs.iterator).future)
 	}
 
 	def src(urls:Array[String]):Stream = {
