@@ -37,7 +37,7 @@ class AsyncStream(tmp:Future[Iterator[VirtualFile]]) extends Stream
 			}
 		}
 
-		Await.result(Future.sequence(mappers.toList), Duration.Inf)
+		Await.ready(Future.sequence(mappers.toList), Duration.Inf)
 
 		if(output.size > 0) {
 			promise success output.iterator
