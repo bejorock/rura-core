@@ -3,6 +3,8 @@ package xyz.rura.labs.io
 import java.io._
 import java.nio.file.FileSystems
 
+import akka.actor.ActorSystem
+
 import scala.io.Source
 import scala.collection.JavaConversions._
 import scala.concurrent.Promise
@@ -16,7 +18,7 @@ import org.apache.commons.io.filefilter.FileFileFilter
 
 object FileStream 
 {
-	def src(globs:Array[String]):Stream = {
+	def src(globs:Array[String])(implicit system:ActorSystem):ReactiveStream = {
 		val files = FileUtils.listFiles(new File("."), new FileFileFilter() {
 			val matchers = globs map{g => FileSystems.getDefault().getPathMatcher("glob:./" + g)}
 
@@ -25,17 +27,13 @@ object FileStream
 			}
 		}, DirectoryFileFilter.DIRECTORY)
 
-		val vfs = files map{f => new VirtualFile() {
-			override def name = f.getName()
-			override def path = f.getPath()
-			override def encoding = Some(VirtualFile.DEFAULT_ENCODING)
-			override def inputstream = new FileInputStream(f)
-		}}
+		val vfs = files map{f => VirtualFile(f.getName(), f.getPath(), Some(VirtualFile.DEFAULT_ENCODING), new FileInputStream(f))}
 
-		return new AsyncStream(Promise.successful(vfs.iterator).future)
+		// return new AsyncStream(Promise.successful(vfs.iterator).future)
+		return new ReactiveStream(vfs)
 	}
 
-	def src(glob:String):Stream = src(Array(glob))
+	def src(glob:String)(implicit system:ActorSystem):ReactiveStream = src(Array(glob))
 
 	def dest(dirName:String):Map = new Map() {
 		val dir = new File(dirName)
@@ -46,6 +44,8 @@ object FileStream
 			
 			IOUtils.copy(f.inputstream, out)
 			out.close()
+
+			callback(f, null)
 		}
 	}
 }

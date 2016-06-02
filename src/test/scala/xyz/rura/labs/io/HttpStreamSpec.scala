@@ -55,7 +55,7 @@ class HttpStreamSpec extends FlatSpec with Matchers
         override def close():Unit = {}
     }
 
-	var stream:Stream = null
+	var stream:AsyncStream = null
 	
   	"Http Stream" should "read input" in {
   		stream = HttpStream.src("http://localhost/api/dummy.json", client)

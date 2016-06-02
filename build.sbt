@@ -16,4 +16,6 @@ libraryDependencies ++= Seq(
   "org.jsoup" % "jsoup" % "1.8.3",
   "com.typesafe.play" %% "play-json" % "2.5.0",
   "commons-io" % "commons-io" % "2.4",
-  "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0")
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0",
+  "com.typesafe.akka" %% "akka-actor" % "2.4.6",
+  "com.typesafe.akka" %% "akka-testkit" % "2.4.6")

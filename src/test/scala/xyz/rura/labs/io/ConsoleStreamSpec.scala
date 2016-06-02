@@ -6,7 +6,7 @@ import scala.io.Source
 
 class ConsoleStreamSpec extends FlatSpec with Matchers 
 {
-	var stream:Stream = null
+	var stream:AsyncStream = null
 	
   	"Console Stream" should "read input" in {
   		stream = ConsoleStream.src("name", "rana")

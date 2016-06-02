@@ -2,14 +2,14 @@ package xyz.rura.labs.io
 
 import scala.collection.mutable.ListBuffer
 
-class BasicStream(var input:List[VirtualFile]) extends Stream
+class BasicStream(var input:List[VirtualFile]) extends Stream[BasicStream]
 {
-	private var output = ListBuffer[VirtualFile]()
-
-	override def pipe(m:Map):Stream = {
+	override def pipe(m:Map):BasicStream = {
 		if(input.size < 1) {
 			throw new Exception("end of stream!!!")
 		}
+
+		val output = ListBuffer[VirtualFile]()
 
 		input foreach{i => m.map(i, (o:VirtualFile, e:Exception) => {
 			if(e != null) {
@@ -22,8 +22,8 @@ class BasicStream(var input:List[VirtualFile]) extends Stream
 		if(output.size > 0) {
 			return new BasicStream(output.toList)
 		} else {
-			return new Stream() {
-				override def pipe(m:Map):Stream = throw new Exception("end of stream!!!")
+			return new BasicStream(List.empty) {
+				override def pipe(m:Map):BasicStream = throw new Exception("end of stream!!!")
 				override def isEnd:Boolean = true
 			}
 		}

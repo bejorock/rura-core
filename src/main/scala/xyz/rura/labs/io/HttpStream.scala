@@ -37,7 +37,7 @@ object HttpStream
 		return url.substring(index, length)
 	}
 
-	def src(urls:Array[String], client:HttpClient):Stream = {
+	def src(urls:Array[String], client:HttpClient):AsyncStream = {
 		val vfs = urls map{url => 
 			val get = new HttpGet(url)
 			val resp = client.execute(get)
@@ -62,7 +62,7 @@ object HttpStream
 		return new AsyncStream(Promise.successful(vfs.iterator).future)
 	}
 
-	def src(urls:Array[String]):Stream = {
+	def src(urls:Array[String]):AsyncStream = {
 		val client = HttpClients.createDefault()
 		val s = src(urls, client)
 
@@ -72,9 +72,9 @@ object HttpStream
 	}
 
 	// GET METHOD ONLY
-	def src(url:String, client:HttpClient):Stream = src(Array(url), client)
+	def src(url:String, client:HttpClient):AsyncStream = src(Array(url), client)
 
-	def src(url:String):Stream = src(Array(url))
+	def src(url:String):AsyncStream = src(Array(url))
 
 	// POST METHOD ONLY
 	def dest(url:String, client:HttpClient):Map = new Map() {

@@ -8,7 +8,7 @@ import scala.concurrent.Promise
 
 object ConsoleStream 
 {
-	def src(labels:Array[String], defaults:Array[String]):Stream = {
+	def src(labels:Array[String], defaults:Array[String]):AsyncStream = {
 		val vfs = labels.zipWithIndex map{case (l, i) => 
 			print(l + ": ")
 
@@ -35,11 +35,11 @@ object ConsoleStream
 		return new AsyncStream(Promise.successful(vfs.iterator).future)
 	}
 
-	def src(labels:Array[String]):Stream = src(labels, Array[String]())
+	def src(labels:Array[String]):AsyncStream = src(labels, Array[String]())
 
-	def src(label:String, default:String):Stream = src(Array(label), Array(default))
+	def src(label:String, default:String):AsyncStream = src(Array(label), Array(default))
 
-	def src(label:String):Stream = src(Array(label), Array[String]())
+	def src(label:String):AsyncStream = src(Array(label), Array[String]())
 
 	def dest:Map = new Map() {
 		def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = {
