@@ -28,33 +28,34 @@ class FileStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) w
 
 	override def afterAll = {
 		TestKit.shutdownActorSystem(system)
+		//system.terminate()
 	}
 
-	"FileStream" must {
+	"File Stream" must {
 		"read input from {source}" in {
-			val streamBuilder = FileStream.src("tmp/src/*.json")
+			val factory = FileStreamFactory.src("tmp/src/*.json")
 
-			Await.result(streamBuilder.toStream, Duration.Inf).zip(List("1.json", "2.json", "3.json", "4.json")) foreach {
+			Await.result(factory.toStream, Duration.Inf).zip(List("1.json", "2.json", "3.json", "4.json")) foreach {
 				case (vf, b) => vf.name should === (b)
 			}
 		}
 
 		"append content" in {
-			val streamBuilder = FileStream.src("tmp/src/*.json").pipe{(vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => 
+			val factory = FileStreamFactory.src("tmp/src/*.json").pipe{(vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => 
 				callback(VirtualFile(vf.name, vf.path, vf.encoding, IOUtils.toInputStream("{\"name\":\"rana loda lubis\"}")), null)
 			}
 
-			Await.result(streamBuilder.toStream, Duration.Inf) foreach{vf =>
+			Await.result(factory.toStream, Duration.Inf) foreach{vf =>
 				IOUtils.toString(vf.inputstream) should === ("{\"name\":\"rana loda lubis\"}")
 			}
 		}
 
 		"write output to {destination}" in {
-			val streamBuilder = FileStream.src("tmp/src/*.json").pipe((vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => {
+			val factory = FileStreamFactory.src("tmp/src/*.json").pipe((vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => {
 				callback(VirtualFile(vf.name, vf.path, vf.encoding, IOUtils.toInputStream("{\"name\":\"rana loda lubis\"}")), null)
-			}).pipe(FileStream.dest("tmp/dest/"))
+			}).pipe(FileStreamFactory.dest("tmp/dest/"))
 
-			Await.result(streamBuilder.toStream, Duration.Inf) foreach{vf => true}
+			Await.result(factory.toStream, Duration.Inf) foreach{vf => true}
 
 			val dstFiles = new File("tmp/dest/").listFiles()
 
@@ -63,11 +64,11 @@ class FileStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) w
 
 		"throw {exception}" in {
 			intercept[Exception] {
-	  			val streamBuilder = FileStream.src("tmp/src/*.json")
+	  			val factory = FileStreamFactory.src("tmp/src/*.json")
 
-	  			Await.result(streamBuilder.toStream, Duration.Inf)
+	  			Await.result(factory.toStream, Duration.Inf)
 
-				Await.result(streamBuilder.toStream, Duration.Inf)	  			
+				Await.result(factory.toStream, Duration.Inf)	  			
 	  		}
 		}
 	}

@@ -1,13 +1,13 @@
 package xyz.rura.labs.io
 
-trait Map extends Serializable
+trait Mapper extends Serializable
 {
 	def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit
 }
 
-object Map
+object Mapper
 {
-	lazy val empty = new Map() {
+	lazy val empty = new Mapper() {
 		def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = {}		
 	}
 }

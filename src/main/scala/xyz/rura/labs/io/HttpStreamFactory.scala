@@ -1,13 +1,9 @@
 package xyz.rura.labs.io
 
-import java.io._
-
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.jsoup.select.Elements
-
-import org.apache.commons.io.IOUtils
 
 import org.apache.http.HttpEntity
 import org.apache.http.client.HttpClient
@@ -26,7 +22,12 @@ import org.apache.http.entity.ByteArrayEntity
 import scala.io.Source
 import scala.concurrent.Promise
 
-object HttpStream 
+import org.apache.commons.io.IOUtils
+import org.apache.commons.io.FileUtils
+
+import akka.actor.ActorSystem
+
+object HttpStreamFactory
 {
 	//private val client = HttpClients.createDefault()
 
@@ -37,7 +38,7 @@ object HttpStream
 		return url.substring(index, length)
 	}
 
-	def src(urls:Array[String], client:HttpClient):AsyncStream = {
+	def src(urls:Array[String], client:HttpClient)(implicit system:ActorSystem):ReactiveStream = {
 		val vfs = urls map{url => 
 			val get = new HttpGet(url)
 			val resp = client.execute(get)
@@ -49,20 +50,13 @@ object HttpStream
 			}
 
 			// create a virtual file
-			val vf = new VirtualFile() {
-				override def name = stemUrl(url)
-				override def path = url
-				override def encoding = Some(VirtualFile.DEFAULT_ENCODING)
-				override def inputstream = new ByteArrayInputStream(contents.getBytes(VirtualFile.DEFAULT_ENCODING))
-			}
-
-			vf
+			VirtualFile(stemUrl(url), url, Some(VirtualFile.DEFAULT_ENCODING), IOUtils.toInputStream(contents))
 		}
 
-		return new AsyncStream(Promise.successful(vfs.iterator).future)
+		return new ReactiveStream(vfs)
 	}
 
-	def src(urls:Array[String]):AsyncStream = {
+	def src(urls:Array[String])(implicit system:ActorSystem):ReactiveStream = {
 		val client = HttpClients.createDefault()
 		val s = src(urls, client)
 
@@ -72,12 +66,14 @@ object HttpStream
 	}
 
 	// GET METHOD ONLY
-	def src(url:String, client:HttpClient):AsyncStream = src(Array(url), client)
+	def src(url:String, client:HttpClient)(implicit system:ActorSystem):ReactiveStream = src(Array(url), client)
 
-	def src(url:String):AsyncStream = src(Array(url))
+	def src(url:String)(implicit system:ActorSystem):ReactiveStream = src(Array(url))
 
 	// POST METHOD ONLY
-	def dest(url:String, client:HttpClient):Map = new Map() {
+	def dest(url:String, _client:HttpClient):Mapper = new Mapper() {
+		val client = _client
+
 		def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = {
 			val post = new HttpPost(url)
 			post.setEntity(new ByteArrayEntity(IOUtils.toByteArray(f.inputstream)))
@@ -85,11 +81,15 @@ object HttpStream
 			val resp = client.execute(post)
 
 			if(resp.getStatusLine().getStatusCode() != 200) {
-				throw new Exception("failed to execute http request, return " + resp.getStatusLine().getStatusCode())
+				//throw new Exception("failed to execute http request, return " + resp.getStatusLine().getStatusCode())
+
+				callback(null, new Exception("failed to execute http request, return " + resp.getStatusLine().getStatusCode()))
+			} else {
+				callback(null, null)
 			}
 		}
 	}
 
 	// [TODO] find out how to close client after execution
-	def dest(url:String):Map = dest(url, HttpClients.createDefault())
+	def dest(url:String):Mapper = dest(url, HttpClients.createDefault())
 }

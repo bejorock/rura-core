@@ -19,3 +19,5 @@ libraryDependencies ++= Seq(
   "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0",
   "com.typesafe.akka" %% "akka-actor" % "2.4.6",
   "com.typesafe.akka" %% "akka-testkit" % "2.4.6")
+
+scalacOptions in Compile := Vector("-Ywarn-infer-any", "-Ywarn-unused-import")

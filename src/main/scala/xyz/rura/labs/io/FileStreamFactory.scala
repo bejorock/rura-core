@@ -16,7 +16,7 @@ import org.apache.commons.io.filefilter.DirectoryFileFilter
 import org.apache.commons.io.filefilter.IOFileFilter
 import org.apache.commons.io.filefilter.FileFileFilter
 
-object FileStream 
+object FileStreamFactory
 {
 	def src(globs:Array[String])(implicit system:ActorSystem):ReactiveStream = {
 		val files = FileUtils.listFiles(new File("."), new FileFileFilter() {
@@ -35,7 +35,7 @@ object FileStream
 
 	def src(glob:String)(implicit system:ActorSystem):ReactiveStream = src(Array(glob))
 
-	def dest(dirName:String):Map = new Map() {
+	def dest(dirName:String):Mapper = new Mapper() {
 		val dir = new File(dirName)
 
 		def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = {

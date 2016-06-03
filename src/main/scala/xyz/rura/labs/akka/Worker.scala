@@ -40,7 +40,7 @@ class Worker extends Actor with ActorLogging
 
 			val classLoader = new AkkaClassLoader(ref, this.getClass().getClassLoader())
 			val in = classLoader.findClass("java.io.ObjectInputStream").getConstructor(classOf[java.io.InputStream]).newInstance(new ByteArrayInputStream(mapBytes)).asInstanceOf[ObjectInputStream]
-			val mapper = in.readObject().asInstanceOf[Map]
+			val mapper = in.readObject().asInstanceOf[Mapper]
 
 			mapper.map(vf, (o:VirtualFile, e:Exception) => {
 				if(e != null) {

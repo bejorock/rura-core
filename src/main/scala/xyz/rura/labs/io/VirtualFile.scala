@@ -16,6 +16,8 @@ object VirtualFile
 	val UNICODE = "UNICODE"
 	val DEFAULT_ENCODING = UTF_8
 
+	val Empty = VirtualFile(null, null, None, null)
+
 	final case class EOF() extends VirtualFile {
 		def name:String = "eof"
 		def path:String = "eof"

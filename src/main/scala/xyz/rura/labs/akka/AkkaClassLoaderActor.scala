@@ -10,8 +10,6 @@ import akka.util.Timeout
 
 import org.apache.commons.io.IOUtils
 
-import java.io._
-
 class AkkaClassLoaderActor extends Actor with ActorLogging
 {
 	def receive = {

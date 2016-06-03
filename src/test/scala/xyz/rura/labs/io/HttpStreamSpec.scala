@@ -17,7 +17,16 @@ import org.apache.http.HttpVersion
 import org.apache.http.HttpEntity
 import org.apache.http.entity.StringEntity
 
-class HttpStreamSpec extends FlatSpec with Matchers 
+import akka.actor.ActorSystem
+import akka.testkit.{ TestActors, DefaultTimeout, ImplicitSender, TestKit }
+import akka.actor.Props
+
+import scala.concurrent.duration._
+import scala.concurrent.Await
+
+import org.apache.commons.io.IOUtils
+
+class HttpStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) with ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll
 {
     // setup mocking
     val client = new CloseableHttpClient() {
@@ -55,23 +64,44 @@ class HttpStreamSpec extends FlatSpec with Matchers
         override def close():Unit = {}
     }
 
-	var stream:AsyncStream = null
-	
-  	"Http Stream" should "read input" in {
-  		stream = HttpStream.src("http://localhost/api/dummy.json", client)
+    def this() = this(ActorSystem("HttpStreamSpec"))
 
-    	stream.isEnd should === (false)
-  	}
+    override def beforeAll = {
 
-  	it should "write output" in {
-  		stream = stream.pipe(HttpStream.dest("http://localhost/api/dummy.json", client))
+    }
 
-  		stream.isEnd should === (true)	
-  	}
+    override def afterAll = {
+        TestKit.shutdownActorSystem(system)
+        //system.terminate()
+    }
 
-  	it should "throw end of input exception" in {
-  		intercept[Exception] {
-  			stream.pipe(HttpStream.dest("http://localhost/api/dummy.json", client))
-  		}
-  	}
+    "Http Stream" must {
+        "read input from {urls}" in {
+            val factory = HttpStreamFactory.src(Array("http://localhost/api/dummy.json"), client)
+
+            Await.result(factory.toStream, Duration.Inf) foreach{vf =>
+                Json.parse(IOUtils.toString(vf.inputstream)).toString should === (Json.parse("""
+                    {
+                        "message": "hello world"
+                    }
+                """).toString)
+            }
+        }
+
+        "write output to {url}" in {
+            val factory = HttpStreamFactory.src(Array("http://localhost/api/dummy.json"), client).pipe(HttpStreamFactory.dest("http://localhost/api/dummy.json", client))
+
+            Await.result(factory.toStream, Duration.Inf).size should === (0)
+        }
+
+        "throw {exception}" in {
+            intercept[Exception] {
+                val factory = HttpStreamFactory.src(Array("http://localhost/api/dummy.json"), client)
+
+                Await.result(factory.toStream, Duration.Inf)
+
+                Await.result(factory.toStream, Duration.Inf)                
+            }
+        }
+    }
 }

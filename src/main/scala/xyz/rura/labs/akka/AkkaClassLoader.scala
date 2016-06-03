@@ -13,8 +13,6 @@ import scala.concurrent.duration._
 
 import org.apache.commons.io.IOUtils
 
-import java.io._
-
 case class LoadClass(name:String)
 
 class AkkaClassLoader(ref:AkkaClassLoaderRef, parent:ClassLoader) extends ClassLoader(parent)

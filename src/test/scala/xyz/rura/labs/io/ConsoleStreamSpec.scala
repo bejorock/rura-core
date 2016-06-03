@@ -3,36 +3,76 @@ package xyz.rura.labs.io
 import org.scalatest._
 
 import scala.io.Source
+import scala.concurrent.duration._
+import scala.concurrent.Await
 
-class ConsoleStreamSpec extends FlatSpec with Matchers 
+import org.apache.commons.io.IOUtils
+
+import akka.actor.ActorSystem
+import akka.testkit.{ TestActors, DefaultTimeout, ImplicitSender, TestKit }
+import akka.actor.Props
+
+import java.io.ByteArrayOutputStream
+
+class ConsoleStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) with ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll
 {
-	var stream:AsyncStream = null
-	
-  	"Console Stream" should "read input" in {
-  		stream = ConsoleStream.src("name", "rana")
+    def this() = this(ActorSystem("ConsoleStreamSpec"))
 
-    	stream.isEnd should === (false)
-  	}
+    override def beforeAll = {
 
-    it should "have content rana" in {
-        stream = stream.pipe(new Map() {
-            def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = {
-                Source.fromInputStream(f.inputstream).mkString should === ("rana")
-
-                callback(f, null)
-            }
-        })
     }
 
-  	it should "write output" in {
-  		stream = stream.pipe(ConsoleStream.dest)
+    override def afterAll = {
+        TestKit.shutdownActorSystem(system)
+        //system.terminate()
+    }
 
-  		stream.isEnd should === (true)
-  	}
+    "Console Stream" must {
+        "read input from console" in {
+            implicit val inOption = Some(IOUtils.toInputStream("rana"))
 
-  	it should "throw end of input exception" in {
-  		intercept[Exception] {
-  			stream.pipe(ConsoleStream.dest)
-  		}
-  	}
+            val factory = ConsoleStreamFactory.src(Array("name"))
+
+            Await.result(factory.toStream, Duration.Inf) foreach{vf =>
+                IOUtils.toString(vf.inputstream) should === ("rana")
+            }
+        }
+
+        "write output to console" in {
+            implicit val inOption = Some(IOUtils.toInputStream("rana"))
+
+            val out = new ByteArrayOutputStream()
+            //implicit val outOption = Some(out)
+
+            val factory = ConsoleStreamFactory.src(Array("name")).pipe(ConsoleStreamFactory.dest(Some(out))) 
+            
+            //Await.result(factory.toStream, Duration.Inf).size should === (0)
+
+            Await.result(factory.toStream, Duration.Inf) foreach{vf =>
+                println(vf.name)
+            }
+
+            val buffer = new StringBuffer()
+            buffer.append("file: name").append("\n")
+            buffer.append("path: .").append("\n")
+            buffer.append("encoding: UTF-8").append("\n")
+            buffer.append("contents: rana").append("\n")
+
+            //TestKit.awaitCond({out.toByteArray.length > 0}, 1 minute)
+
+            IOUtils.toString(out.toByteArray, "UTF-8") should === (buffer.toString)
+        }
+
+        "throw {exception}" in {
+            implicit val inOption = Some(IOUtils.toInputStream("rana"))
+            
+            intercept[Exception] {
+                val factory = ConsoleStreamFactory.src(Array("name"))
+
+                Await.result(factory.toStream, Duration.Inf)
+
+                Await.result(factory.toStream, Duration.Inf)                
+            }
+        }
+    }
 }
