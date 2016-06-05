@@ -139,15 +139,19 @@ object CommonReactiveWorker
 
 		def receive = {
 			case Request(vf) => {
-				mapper.map(vf, (out, err) => {
-					if(err != null) {
-						sender ! err
-					} else if(out != null) {
-						sender ! out
-					} else {
-						sender ! None
-					}
-				})
+				try { 
+					mapper.map(vf, (out, err) => {
+						if(err != null) {
+							sender ! err
+						} else if(out != null) {
+							sender ! out
+						} else {
+							sender ! None
+						}
+					})
+				} catch {
+				  	case e: Exception => sender ! e
+				}
 			}
 		}
 	}
