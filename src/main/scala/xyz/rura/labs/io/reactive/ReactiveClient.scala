@@ -38,6 +38,7 @@ import java.io.ObjectOutputStream
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.ArrayBlockingQueue
 
 import xyz.rura.labs.io._
 
@@ -46,8 +47,8 @@ class ReactiveClient(input:Iterator[VirtualFile], target:ActorSelection) extends
 	import ReactiveStream.{Request, Response, Error, Output, WorkerNotReady, EOF}
 	import context.dispatcher
 
-	private var queue = new LinkedBlockingQueue[VirtualFile](1000)
-	private val slots = new LinkedBlockingQueue[Boolean](1000)
+	private var queue = new ArrayBlockingQueue[VirtualFile](1000)
+	private val slots = new ArrayBlockingQueue[Boolean](1000)
 
 	private def outputStream = Future {
 		def next(vf:VirtualFile):ScalaStream[VirtualFile] = {

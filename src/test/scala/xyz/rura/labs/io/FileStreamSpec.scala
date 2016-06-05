@@ -5,6 +5,7 @@ import org.scalatest._
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.io.File
+import java.text.DecimalFormat
 
 import akka.actor.ActorSystem
 import akka.testkit.{ TestActors, DefaultTimeout, ImplicitSender, TestKit }
@@ -16,9 +17,12 @@ import org.apache.commons.io.FileUtils
 import scala.io.Source
 import scala.concurrent.duration._
 import scala.concurrent.Await
+import scala.concurrent.Future
 
 class FileStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) with ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll
 {
+	import system.dispatcher
+
 	def this() = this(ActorSystem("FileStreamSpec"))
 
 	override def beforeAll = {
@@ -27,6 +31,13 @@ class FileStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) w
 	}
 
 	override def afterAll = {
+		// reset file
+
+		FileUtils.write(new File("./tmp/src/1.json"), "{}")
+		FileUtils.write(new File("./tmp/src/2.json"), "{}")
+		FileUtils.write(new File("./tmp/src/3.json"), "{}")
+		FileUtils.write(new File("./tmp/src/4.json"), "{}")
+
 		TestKit.shutdownActorSystem(system)
 		//system.terminate()
 	}
@@ -47,6 +58,37 @@ class FileStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) w
 
 			Await.result(factory.toStream, Duration.Inf) foreach{vf =>
 				IOUtils.toString(vf.inputstream) should === ("{\"name\":\"rana loda lubis\"}")
+			}
+		}
+
+		"watch {files} for a {duration}" in {
+			val factory = FileStreamFactory.watch(Array("tmp/src/*.json"), 1 minute)
+
+			val d = (30 seconds)
+			// try to change files
+			Future {
+				val deadline = d.asInstanceOf[FiniteDuration].fromNow
+
+				while(!deadline.isOverdue) {
+					FileUtils.write(new File("./tmp/src/1.json"), "{\"name\":\"rana\"}")
+					FileUtils.write(new File("./tmp/src/2.json"), "{\"name\":\"rana\"}")
+					FileUtils.write(new File("./tmp/src/3.json"), "{\"name\":\"rana\"}")
+					FileUtils.write(new File("./tmp/src/4.json"), "{\"name\":\"rana\"}")
+
+					Thread.sleep(5000)
+				}
+			}
+
+			val decimalFormat = new DecimalFormat("#,###,###")
+			var counter = 0
+			Await.result(factory.toStream, d) foreach{vf =>
+				counter += 1
+				val name = vf.name
+				val total = decimalFormat.format(counter)
+
+				print(s"$total changes, last change : $name\r")
+
+				IOUtils.toString(vf.inputstream) should === ("{\"name\":\"rana\"}")
 			}
 		}
 

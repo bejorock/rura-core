@@ -20,12 +20,18 @@ import org.apache.http.util.EntityUtils
 import org.apache.http.entity.ByteArrayEntity
 
 import scala.io.Source
+import scala.concurrent.Future
 import scala.concurrent.Promise
+import scala.concurrent.Await
+import scala.concurrent.duration._
 
 import org.apache.commons.io.IOUtils
 import org.apache.commons.io.FileUtils
 
+import java.util.concurrent.ArrayBlockingQueue
+
 import akka.actor.ActorSystem
+import akka.event.Logging
 
 object HttpStreamFactory
 {
@@ -69,6 +75,62 @@ object HttpStreamFactory
 	def src(url:String, client:HttpClient)(implicit system:ActorSystem):ReactiveStream = src(Array(url), client)
 
 	def src(url:String)(implicit system:ActorSystem):ReactiveStream = src(Array(url))
+
+	def watch(url:String, _client:HttpClient, duration:Duration)(implicit system:ActorSystem):ReactiveStream = {
+		import system.dispatcher
+
+		// create input
+		val input = new Iterable[VirtualFile]() {
+			val client = _client
+			val log = Logging(system, this.getClass())
+
+			def iterator = new Iterator[VirtualFile]() {
+				val queue = new ArrayBlockingQueue[VirtualFile](1)
+				val deadline = duration.isFinite match {
+					case false => null
+					case true => duration.asInstanceOf[FiniteDuration].fromNow
+				}
+
+				Future {
+					// fetch the url content here
+					while(!isExpired) {
+						val get = new HttpGet(url)
+						val resp = client.execute(get)
+						val entity = resp.getEntity()
+						val contents = EntityUtils.toString(entity)
+
+						Thread.sleep(10000)
+
+						if(resp.getStatusLine().getStatusCode() != 200) {
+							val code = resp.getStatusLine().getStatusCode()
+							val reason = resp.getStatusLine().getReasonPhrase()
+
+							log.debug(s"$code fail to fetch content because $reason")
+						} else {
+							// create a virtual file
+							queue.put(VirtualFile(stemUrl(url), url, Some(VirtualFile.DEFAULT_ENCODING), IOUtils.toInputStream(contents)))
+						}
+					}
+
+					//queue.put(null)
+				}
+
+				def isExpired:Boolean = {
+					if(!duration.isFinite) {
+						return false
+					} else {
+						return deadline.isOverdue
+					}
+				}
+
+				def hasNext:Boolean = !isExpired
+
+				def next:VirtualFile = queue.take()
+			}
+		}
+
+		return new ReactiveStream(input)
+	}	
 
 	// POST METHOD ONLY
 	def dest(url:String, _client:HttpClient):Mapper = new Mapper() {

@@ -26,6 +26,8 @@ import scala.concurrent.Await
 
 import org.apache.commons.io.IOUtils
 
+import java.text.DecimalFormat
+
 class HttpStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) with ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll
 {
     // setup mocking
@@ -92,6 +94,32 @@ class HttpStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) w
             val factory = HttpStreamFactory.src(Array("http://localhost/api/dummy.json"), client).pipe(HttpStreamFactory.dest("http://localhost/api/dummy.json", client))
 
             Await.result(factory.toStream, Duration.Inf).size should === (0)
+        }
+
+        "watch a {url} for a {duration}" in {
+            val factory = HttpStreamFactory.watch("http://localhost/api/dummy.json", client, 1 minutes).pipe{(vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => 
+                val json = Json.parse(IOUtils.toString(vf.inputstream)).asInstanceOf[JsObject] + ("name" -> JsString("rana loda tama"))
+
+                callback(VirtualFile(vf.name, vf.path, vf.encoding, IOUtils.toInputStream(json.toString)), null)
+            }
+
+            var counter = 0l
+            val decimalFormat = new DecimalFormat("#,###,###")
+            Await.result(factory.toStream, Duration.Inf) foreach{vf => 
+                counter += 1
+
+                val total = decimalFormat.format(counter)
+                val name = vf.path
+
+                print(s"total fetch $total, last path : $name\r")
+
+                Json.parse(IOUtils.toString(vf.inputstream)).toString should === (Json.parse("""
+                    {
+                        "message": "hello world",
+                        "name": "rana loda tama"
+                    }
+                """).toString)   
+            }
         }
 
         "throw {exception}" in {

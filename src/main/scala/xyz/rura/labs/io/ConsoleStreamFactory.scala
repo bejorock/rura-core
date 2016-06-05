@@ -34,12 +34,6 @@ object ConsoleStreamFactory
 		return new ReactiveStream(vfs)
 	}
 
-	//def src(labels:Array[String])(implicit system:ActorSystem):ReactiveStream = src(labels, Array[String]())
-
-	//def src(label:String, default:String)(implicit system:ActorSystem):ReactiveStream = src(Array(label), Array(default))
-
-	//def src(label:String)(implicit system:ActorSystem, inOption:Option[InputStream] = None):ReactiveStream = src(Array(label))
-
 	def dest(implicit o:Option[OutputStream] = None):Mapper = new Mapper() {
 		val out = o
 
