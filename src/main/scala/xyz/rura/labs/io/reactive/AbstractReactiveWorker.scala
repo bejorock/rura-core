@@ -74,6 +74,8 @@ abstract class AbstractReactiveWorker extends Actor with ActorLogging
 
 	final def active:Receive = synchronized {
 		case EOF() => {
+			log.debug("got eof message, preparing to exit")
+
 			eof()
 
 			self.tell(ResetWorker(true), sender)
