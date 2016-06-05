@@ -143,6 +143,8 @@ object CommonReactiveWorker
 
 				try { 
 					mapper.map(vf, (out, err) => {
+						log.debug("trying to send result to {}", sender.path)
+
 						if(err != null) {
 							session ! err
 						} else if(out != null) {
