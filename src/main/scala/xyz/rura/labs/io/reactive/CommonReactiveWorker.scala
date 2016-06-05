@@ -139,18 +139,20 @@ object CommonReactiveWorker
 
 		def receive = {
 			case Request(vf) => {
+				val session = sender
+
 				try { 
 					mapper.map(vf, (out, err) => {
 						if(err != null) {
-							sender ! err
+							session ! err
 						} else if(out != null) {
-							sender ! out
+							session ! out
 						} else {
-							sender ! None
+							session ! None
 						}
 					})
 				} catch {
-				  	case e: Exception => sender ! e
+				  	case e: Exception => session ! e
 				}
 			}
 		}
