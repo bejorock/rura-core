@@ -48,7 +48,9 @@ class FileStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) w
 		"read input from {source}" in {
 			val factory = FileStreamFactory.src("tmp/src/*.json")
 
-			Await.result(factory.toStream, Duration.Inf).zip(List("1.json", "2.json", "3.json", "4.json")) foreach {
+			val stream = Await.result(factory.toStream, Duration.Inf)
+
+			Await.result(stream.result, Duration.Inf).zip(List("1.json", "2.json", "3.json", "4.json")) foreach {
 				case (vf, b) => vf.name should === (b)
 			}
 		}
@@ -58,7 +60,9 @@ class FileStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) w
 				callback(VirtualFile(vf.name, vf.path, vf.encoding, IOUtils.toInputStream("{\"name\":\"rana loda lubis\"}")), null)
 			}
 
-			Await.result(factory.toStream, Duration.Inf) foreach{vf =>
+			val stream = Await.result(factory.toStream, Duration.Inf) 
+
+			Await.result(stream.result, Duration.Inf) foreach{vf =>
 				IOUtils.toString(vf.inputstream) should === ("{\"name\":\"rana loda lubis\"}")
 			}
 		}
@@ -83,7 +87,9 @@ class FileStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) w
 
 			val decimalFormat = new DecimalFormat("#,###,###")
 			var counter = 0
-			Await.result(factory.toStream, d) foreach{vf =>
+			val stream = Await.result(factory.toStream, d) 
+
+			Await.result(stream.result, Duration.Inf) foreach{vf =>
 				counter += 1
 				val name = vf.name
 				val total = decimalFormat.format(counter)
@@ -99,7 +105,9 @@ class FileStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) w
 				callback(VirtualFile(vf.name, vf.path, vf.encoding, IOUtils.toInputStream("{\"name\":\"rana loda lubis\"}")), null)
 			}).pipe(FileStreamFactory.dest("tmp/dest/"))
 
-			Await.result(factory.toStream, Duration.Inf) foreach{vf => true}
+			val stream = Await.result(factory.toStream, Duration.Inf) 
+
+			Await.result(stream.result, Duration.Inf) foreach{vf => true}
 
 			val dstFiles = new File("tmp/dest/").listFiles()
 

@@ -41,7 +41,7 @@ import xyz.rura.labs.io._
 
 trait ReactiveProxy 
 {
-	def output:Future[Iterable[VirtualFile]]
+	def output:Future[ReactiveOutput]
 }
 
 class ReactiveProxyImpl(client:ActorRef) extends ReactiveProxy with TypedActor.PostStop
@@ -52,5 +52,5 @@ class ReactiveProxyImpl(client:ActorRef) extends ReactiveProxy with TypedActor.P
 
 	def postStop():Unit = log.debug("proxy {} stopped!!!", TypedActor.context.self.path)
 
-	override def output:Future[Iterable[VirtualFile]] = (client ? Output()).mapTo[Iterable[VirtualFile]]
+	override def output:Future[ReactiveOutput] = (client ? Output()).mapTo[ReactiveOutput]
 }

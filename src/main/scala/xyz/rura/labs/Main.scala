@@ -20,9 +20,12 @@ import xyz.rura.labs.io._
 object Main
 {
 	def main(args:Array[String]):Unit = {
-		Kamon.start()
+		System.setProperty("kamon.enable", "false")
+
+		//Kamon.start()
 
 		implicit val system = ActorSystem("ReactiveStreamSpec")
+		implicit val ec = system.dispatcher
 
 		def dummyData = new Iterable[VirtualFile]() {
 			def iterator = Iterator.fill(1000){
@@ -67,29 +70,47 @@ object Main
 			}
 		}, 15, "step4").toStream
 
-		val stream = Await.result(streamFuture, Duration.Inf)
+		val stream = Await.result(streamFuture, Duration.Inf).nonBlocking
 
 		val decimalFormat = new DecimalFormat("#,###,###")
 		val format = new DecimalFormat("#,##0.00")
 		var counter = 0
-		stream foreach{vf =>
-			counter += 1
 
-			val diffTime = java.lang.System.currentTimeMillis() - startTime
+		// get result
+		stream.result onSuccess{
+			case result => result foreach{vf =>
+				counter += 1
 
-			val total = decimalFormat.format(counter)
-			val name = vf.name
-			val speed = format.format(counter.toDouble / (diffTime / 1000))
+				val diffTime = java.lang.System.currentTimeMillis() - startTime
 
-			//print(s"receive $total messages, last message: $name, speed $speed msg/sec\r")
+				val total = decimalFormat.format(counter)
+				val name = vf.name
+				val speed = format.format(counter.toDouble / (diffTime / 1000))
 
-			//vf.name.endsWith("-xoxo-xdxd-yoyo-wkwk") should === (true)
+				print(s"receive $total messages, last message: $name, speed $speed msg/sec\r")
+			}
 		}
 
-		//Thread.sleep(10000)
+		var counterError = 0
+		// get error
+		stream.error onSuccess{
+			case error => error foreach{e =>
+				counterError += 1
 
-		system.shutdown()
+				val diffTime = java.lang.System.currentTimeMillis() - startTime
 
-		Kamon.shutdown()
+				val total = decimalFormat.format(counter)
+				val name = e.vf.name
+				val speed = format.format(counter.toDouble / (diffTime / 1000))
+
+				print(s"error $total messages, last message: $name, speed $speed msg/sec\r")
+			}
+		}
+
+		stream onComplete{() => 
+			system.shutdown()
+
+			//Kamon.shutdown()
+		}
 	}
 }

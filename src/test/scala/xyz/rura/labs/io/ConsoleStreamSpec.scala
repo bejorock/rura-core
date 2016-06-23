@@ -39,7 +39,9 @@ class ConsoleStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem
 
             val factory = ConsoleStreamFactory.src(Array("name"))
 
-            Await.result(factory.toStream, Duration.Inf) foreach{vf =>
+            val stream = Await.result(factory.toStream, Duration.Inf) 
+            
+            Await.result(stream.result, Duration.Inf) foreach{vf =>
                 IOUtils.toString(vf.inputstream) should === ("rana")
             }
         }
@@ -54,7 +56,9 @@ class ConsoleStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem
             
             //Await.result(factory.toStream, Duration.Inf).size should === (0)
 
-            Await.result(factory.toStream, Duration.Inf) foreach{vf =>
+            val stream = Await.result(factory.toStream, Duration.Inf) 
+
+            Await.result(stream.result, Duration.Inf) foreach{vf =>
                 println(vf.name)
             }
 

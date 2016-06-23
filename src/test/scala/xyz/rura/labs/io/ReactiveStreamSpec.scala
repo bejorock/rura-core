@@ -22,7 +22,7 @@ import java.text.DecimalFormat
 class ReactiveStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) with ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll 
 {
 	System.setProperty("kamon.enable", "false")
-	
+
 	//private val log = Logging(system, this.getClass)
 
 	def this() = this(ActorSystem("ReactiveStreamSpec"))
@@ -90,12 +90,12 @@ class ReactiveStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSyste
 				}
 			}, 15, "step4").toStream
 
-			val stream = Await.result(streamFuture, Duration.Inf)
+			val stream = Await.result(streamFuture, Duration.Inf).nonBlocking
 
 			val decimalFormat = new DecimalFormat("#,###,###")
 			val format = new DecimalFormat("#,##0.00")
 			var counter = 0
-			stream foreach{vf =>
+			Await.result(stream.result, Duration.Inf) foreach{vf =>
 				counter += 1
 
 				val diffTime = java.lang.System.currentTimeMillis() - startTime

@@ -33,12 +33,12 @@ libraryDependencies ++= Seq(
 
 scalacOptions in Compile := Vector("-Ywarn-infer-any", "-Ywarn-unused-import")
 
-aspectjSettings
+//aspectjSettings
 
-javaOptions in (Test, run) <++= AspectjKeys.weaverOptions in Aspectj
+//javaOptions in (Test, run) <++= AspectjKeys.weaverOptions in Aspectj
 
 //javaOptions in testOnly <++= AspectjKeys.weaverOptions in Aspectj
 
-fork in (Test, run) := true
+//fork in (Test, run) := true
 
 //fork in test := true

@@ -45,6 +45,7 @@ import java.io.ObjectOutputStream
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.LinkedBlockingQueue
 
+import xyz.rura.labs._
 import xyz.rura.labs.io._
 import xyz.rura.labs.util._
 
@@ -60,8 +61,10 @@ class CommonReactiveWorker extends AbstractReactiveWorker
 	private val processes = ListBuffer[Future[Boolean]]()
 
 	private var childs = ActorRef.noSender
-	//private var mapper = Mapper.empty
 	private var nextTarget = Option.empty[ActorSelection]
+
+	// for single worker only
+	private var mapper:Option[Mapper] = None
 
 	override def preStart():Unit = log.debug("starting worker {}...", self.path)
 
@@ -94,9 +97,29 @@ class CommonReactiveWorker extends AbstractReactiveWorker
 		// assign current sender
 		val session = sender
 		val sessionTarget = nextTarget
-		// post request to childs
 		try { 
-		  	val reqFuture:Future[Boolean] = Await.result((childs ? DelegateRequest(vf, session, sessionTarget)).mapTo[Future[Boolean]], Duration.Inf)
+		  	val reqFuture:Future[Boolean] = mapper match {
+		  		// post request to childs
+		  		case None => Await.result((childs ? DelegateRequest(vf, session, sessionTarget)).mapTo[Future[Boolean]], Duration.Inf)
+
+		  		// do the work by itself
+		  		case Some(mapperInstance) => {
+		  			mapperInstance.map(vf, (out, err) => {
+						if(err != null) {
+							session ! Error(err)
+						} else if(out != null) {
+							sessionTarget match {
+								case None => session ! Response(out)
+								case Some(target) => target.tell(Request(out), session)
+							}
+						} else {
+							//session ! None
+						}
+					})
+
+					Promise.successful(true).future
+		  		}
+		  	}
 
 			addProcess(reqFuture)
 
@@ -109,13 +132,24 @@ class CommonReactiveWorker extends AbstractReactiveWorker
 				}
 			}
 		} catch {
-		  	case e: Exception => e.printStackTrace()
+			case e: ReactiveException => session ! Error(e)
+		  	case e: Exception => session ! Error(new ReactiveException(vf, e))
 		}
 	}
 
 	def reset(eofOrigin:Boolean) = {
-		// wait to stop all children
-		Await.ready(gracefulStop(childs, 5 minutes), 5 minutes)
+		mapper match {
+			case None => {
+				// wait to stop all children
+				Await.ready(gracefulStop(childs, 5 minutes), 5 minutes)
+
+				childs = ActorRef.noSender
+			}
+
+			case Some(mapperInstance) => {
+				mapper = None
+			}
+		}
 
 		if(eofOrigin) {
 			// send eof to next target
@@ -125,10 +159,7 @@ class CommonReactiveWorker extends AbstractReactiveWorker
 			}
 		}
 
-		childs = ActorRef.noSender
-
 		// reset mapper and next target
-		//mapper = Mapper.empty
 		nextTarget = Option.empty[ActorSelection]
 	}
 
@@ -136,7 +167,11 @@ class CommonReactiveWorker extends AbstractReactiveWorker
 		// setup childs router
 		//this.childs = this.context.actorOf(BalancingPool(num).props(Props(classOf[CommonReactiveWorker.SlaveWorker], mapper).withMailbox("prio-mailbox").withDispatcher("worker-pinned-dispatcher")), "slave")
 
-		this.childs = this.context.actorOf(Props(classOf[CommonReactiveWorker.SmallestMailboxRouter], num, mapperProps).withMailbox("prio-mailbox").withDispatcher("worker-pinned-dispatcher"), "slave")
+		if(num > 1) {
+			this.childs = this.context.actorOf(Props(classOf[CommonReactiveWorker.SmallestMailboxRouter], num, mapperProps).withMailbox("prio-mailbox").withDispatcher("worker-pinned-dispatcher"), "slave")
+		} else {
+			this.mapper = Some(mapperProps.get())
+		}
 
 		// setup mapper and next target
 		//this.mapper = mapper
@@ -175,7 +210,10 @@ object CommonReactiveWorker
 				try { 
 					mapper.map(vf, (out, err) => {
 						if(err != null) {
-							session ! Error(err)
+							err match {
+								case e: ReactiveException => session ! Error(err)
+								case e: Exception => session ! Error(new ReactiveException(vf, e))
+							}
 						} else if(out != null) {
 							nextTarget match {
 								case None => session ! Response(out)
@@ -188,7 +226,8 @@ object CommonReactiveWorker
 
 					promise success true
 				} catch {
-				  	case e: Exception => promise failure e
+					case e: ReactiveException => promise failure e
+				  	case e: Exception => promise failure new ReactiveException(vf, e)
 				}
 			}
 		}

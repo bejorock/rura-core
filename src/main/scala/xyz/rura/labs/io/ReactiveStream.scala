@@ -134,7 +134,7 @@ class ReactiveStream(iterable:Iterable[VirtualFile], streamName:String = Reactiv
 
 	def isExpired = expired
 
-	def toStream:Future[Iterable[VirtualFile]] = {
+	def toStream:Future[ReactiveOutput] = {
 		if(expired) {
 			throw new Exception("this builder has expired")
 		}
@@ -150,7 +150,7 @@ class ReactiveStream(iterable:Iterable[VirtualFile], streamName:String = Reactiv
 			case None => {
 				//log.error("target cannot null", new Exception("not found valid target"))
 
-				return Promise.successful(iterable).future
+				return Promise.successful(new DirectReactiveOutput(iterable)).future
 			}
 
 			case Some(t) => {
@@ -160,9 +160,7 @@ class ReactiveStream(iterable:Iterable[VirtualFile], streamName:String = Reactiv
 				val outputFuture = proxy.output
 
 				outputFuture onSuccess {
-					case output => Future { 
-						while(!output.hasDefiniteSize) { Thread.sleep(1000) } 
-
+					case output => output onComplete{() =>
 						// stop client
 						client ! PoisonPill.getInstance
 						// stop proxy

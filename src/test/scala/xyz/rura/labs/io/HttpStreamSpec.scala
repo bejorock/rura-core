@@ -31,7 +31,7 @@ import java.text.DecimalFormat
 class HttpStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) with ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll
 {
     System.setProperty("kamon.enable", "false")
-    
+
     // setup mocking
     val client = new CloseableHttpClient() {
         override def doExecute(target:HttpHost, request:HttpRequest, context:HttpContext):CloseableHttpResponse = {
@@ -83,7 +83,9 @@ class HttpStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) w
         "read input from {urls}" in {
             val factory = HttpStreamFactory.src(Array("http://localhost/api/dummy.json"), client)
 
-            Await.result(factory.toStream, Duration.Inf) foreach{vf =>
+            val stream = Await.result(factory.toStream, Duration.Inf)
+
+            Await.result(stream.result, Duration.Inf) foreach{vf =>
                 Json.parse(IOUtils.toString(vf.inputstream)).toString should === (Json.parse("""
                     {
                         "message": "hello world"
@@ -95,7 +97,9 @@ class HttpStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) w
         "write output to {url}" in {
             val factory = HttpStreamFactory.src(Array("http://localhost/api/dummy.json"), client).pipe(HttpStreamFactory.dest("http://localhost/api/dummy.json", client))
 
-            Await.result(factory.toStream, Duration.Inf).size should === (0)
+            val stream = Await.result(factory.toStream, Duration.Inf)
+
+            Await.result(stream.result, Duration.Inf).size should === (0)
         }
 
         "watch a {url} for a {duration}" in {
@@ -107,7 +111,9 @@ class HttpStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) w
 
             var counter = 0l
             val decimalFormat = new DecimalFormat("#,###,###")
-            Await.result(factory.toStream, Duration.Inf) foreach{vf => 
+            val stream = Await.result(factory.toStream, Duration.Inf)
+
+            Await.result(stream.result, Duration.Inf) foreach{vf => 
                 counter += 1
 
                 val total = decimalFormat.format(counter)
