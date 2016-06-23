@@ -14,6 +14,8 @@ import java.io.InputStream
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
+import xyz.rura.labs.util._
+
 object ConsoleStreamFactory
 {
 	def src(labels:Array[String])(implicit system:ActorSystem, inOption:Option[InputStream] = None):ReactiveStream = {
@@ -34,9 +36,9 @@ object ConsoleStreamFactory
 		return new ReactiveStream(vfs)
 	}
 
-	def dest(implicit o:Option[OutputStream] = None):Mapper = new Mapper() {
-		val out = o
+	def dest(implicit o:Option[OutputStream] = None):ClassProps[Mapper] = ClassProps(classOf[ConsoleStreamFactory.Dest], o)
 
+	final class Dest(out:Option[OutputStream]) extends AbstractMapper {
 		def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = {
 			Console.withOut(out.getOrElse(Console.out)) {
 				println("file: " + f.name)
@@ -46,7 +48,7 @@ object ConsoleStreamFactory
 			}
 
 			// must call callback
-			callback(null, null)
+			callback(f, null)
 		}
 	}
 }

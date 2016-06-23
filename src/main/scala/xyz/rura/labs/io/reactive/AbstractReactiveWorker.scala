@@ -39,10 +39,11 @@ import java.io.ByteArrayOutputStream
 import java.util.concurrent.LinkedBlockingQueue
 
 import xyz.rura.labs.io._
+import xyz.rura.labs.util._
 
 abstract class AbstractReactiveWorker extends Actor with ActorLogging
 {
-	import ReactiveStream.{Request, Response, Error, SetupWorker, ResetWorker, WorkerNotReady, defaultTimeout, EOF}
+	import ReactiveStream.{Request, Response, Error, SetupWorker, ResetWorker, WorkerNotReady, defaultTimeout, EOF, Ping, Pong}
 	import context.dispatcher
 
 	def eof():Unit = {}
@@ -51,14 +52,14 @@ abstract class AbstractReactiveWorker extends Actor with ActorLogging
 
 	def reset(eofOrigin:Boolean):Unit
 
-	def setup(mapper:Mapper, nextTarget:Option[ActorSelection], num:Int):Unit
+	def setup(mapperProps:ClassProps[_ <: Mapper], nextTarget:Option[ActorSelection], num:Int):Unit
 
 	def notReady(vf:VirtualFile):Unit = {}
 
 	final def receive = synchronized {
-		case SetupWorker(mapper, nextTarget, num) => {
+		case SetupWorker(mapperProps, nextTarget, num) => {
 			// do worker initial setup
-			setup(mapper, nextTarget, num)
+			setup(mapperProps, nextTarget, num)
 
 			// actor becomes active
 			context.become(active)
@@ -70,6 +71,8 @@ abstract class AbstractReactiveWorker extends Actor with ActorLogging
 
 			notReady(vf)
 		}
+
+		case Ping() => sender ! Pong()
 	}
 
 	final def active:Receive = synchronized {
@@ -89,5 +92,7 @@ abstract class AbstractReactiveWorker extends Actor with ActorLogging
 			// actor becomes inactive
 			context.unbecome()
 		}
+
+		case Ping() => sender ! Pong()
 	}
 }

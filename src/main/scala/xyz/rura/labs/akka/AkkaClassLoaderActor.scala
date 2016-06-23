@@ -1,4 +1,4 @@
-package xyz.rura.labs.akka
+/*package xyz.rura.labs.akka
 
 import akka.actor.Actor
 import akka.actor.ActorRef
@@ -22,4 +22,4 @@ class AkkaClassLoaderActor extends Actor with ActorLogging
 			sender ! IOUtils.toByteArray(in)
 		}
 	}
-}
+}*/

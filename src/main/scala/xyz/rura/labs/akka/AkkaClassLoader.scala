@@ -1,4 +1,4 @@
-package xyz.rura.labs.akka
+/*package xyz.rura.labs.akka
 
 import akka.actor.Actor
 import akka.actor.ActorRef
@@ -40,4 +40,4 @@ class AkkaClassLoaderRefImpl(ref:ActorRef) extends AkkaClassLoaderRef
 	implicit val timeout = Timeout(5 minutes)
 
 	override def load(name:String):Array[Byte] = Await.result((ref ? LoadClass(name)).mapTo[Array[Byte]], Duration.Inf)
-}
+}*/

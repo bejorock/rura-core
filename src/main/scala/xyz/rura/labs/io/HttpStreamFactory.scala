@@ -33,6 +33,8 @@ import java.util.concurrent.ArrayBlockingQueue
 import akka.actor.ActorSystem
 import akka.event.Logging
 
+import xyz.rura.labs.util._
+
 object HttpStreamFactory
 {
 	//private val client = HttpClients.createDefault()
@@ -76,7 +78,7 @@ object HttpStreamFactory
 
 	def src(url:String)(implicit system:ActorSystem):ReactiveStream = src(Array(url))
 
-	def watch(url:String, _client:HttpClient, duration:Duration)(implicit system:ActorSystem):ReactiveStream = {
+	def watch(url:String, _client:HttpClient, duration:Duration, interval:Int)(implicit system:ActorSystem):ReactiveStream = {
 		import system.dispatcher
 
 		// create input
@@ -93,13 +95,18 @@ object HttpStreamFactory
 
 				Future {
 					// fetch the url content here
+					var firstRun = true
 					while(!isExpired) {
 						val get = new HttpGet(url)
 						val resp = client.execute(get)
 						val entity = resp.getEntity()
 						val contents = EntityUtils.toString(entity)
 
-						Thread.sleep(10000)
+						if(firstRun) {
+							firstRun = false
+						} else {
+							Thread.sleep(interval)
+						}
 
 						if(resp.getStatusLine().getStatusCode() != 200) {
 							val code = resp.getStatusLine().getStatusCode()
@@ -130,12 +137,15 @@ object HttpStreamFactory
 		}
 
 		return new ReactiveStream(input)
-	}	
+	}
 
 	// POST METHOD ONLY
-	def dest(url:String, _client:HttpClient):Mapper = new Mapper() {
-		val client = _client
+	def dest(url:String, _client:HttpClient):ClassProps[Mapper] = ClassProps(classOf[Dest], url, _client)
 
+	// [TODO] find out how to close client after execution
+	def dest(url:String):ClassProps[Mapper] = dest(url, HttpClients.createDefault())
+
+	final class Dest(url:String, client:HttpClient) extends AbstractMapper {
 		def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = {
 			val post = new HttpPost(url)
 			post.setEntity(new ByteArrayEntity(IOUtils.toByteArray(f.inputstream)))
@@ -151,7 +161,4 @@ object HttpStreamFactory
 			}
 		}
 	}
-
-	// [TODO] find out how to close client after execution
-	def dest(url:String):Mapper = dest(url, HttpClients.createDefault())
 }

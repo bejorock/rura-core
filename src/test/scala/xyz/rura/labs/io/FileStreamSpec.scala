@@ -23,6 +23,8 @@ class FileStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) w
 {
 	import system.dispatcher
 
+	System.setProperty("kamon.enable", "false")
+
 	def this() = this(ActorSystem("FileStreamSpec"))
 
 	override def beforeAll = {

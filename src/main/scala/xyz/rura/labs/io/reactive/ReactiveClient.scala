@@ -18,10 +18,12 @@ import akka.actor.Terminated
 import akka.routing.RoundRobinPool
 import akka.routing.Broadcast
 import akka.event.Logging
+import akka.actor.Cancellable
 
 import scala.concurrent.Future
 import scala.concurrent.Promise
 import scala.concurrent.Await
+//import scala.concurrent.duration._
 import scala.collection.immutable.{Stream => ScalaStream}
 import scala.collection.mutable.ListBuffer
 //import scala.concurrent.ExecutionContext.Implicits.global
@@ -41,26 +43,23 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.ArrayBlockingQueue
 
 import xyz.rura.labs.io._
+import xyz.rura.labs.io.monitor._
+
+import kamon.trace.Tracer
+import kamon.trace.EmptyTraceContext
+import kamon.Kamon
+import kamon.metric.instrument.Time
+import kamon.util.RelativeNanoTimestamp
+import kamon.util.NanoInterval
 
 class ReactiveClient(input:Iterator[VirtualFile], target:ActorSelection) extends Actor with ActorLogging
 {
-	import ReactiveStream.{Request, Response, Error, Output, WorkerNotReady, EOF}
+	import ReactiveStream.{Request, Response, Error, Output, WorkerNotReady, EOF, Ping, Pong}
 	import context.dispatcher
 
 	private var queue = new ArrayBlockingQueue[VirtualFile](1000)
-	private val slots = new ArrayBlockingQueue[Boolean](1000)
-
-	private def outputStream = Future {
-		def next(vf:VirtualFile):ScalaStream[VirtualFile] = {
-			if(vf.isInstanceOf[VirtualFile.EOF]) {
-				Stream.empty
-			} else {
-				vf #:: next(queue.take())
-			}
-		}
-
-		next(queue.take())
-	}
+	private lazy val slots = new ArrayBlockingQueue[Boolean](1000)
+	private lazy val metrics = Kamon.metrics.entity(ReactiveClientMetrics, context.system.name + "_" + self.path.elements.mkString("_"))
 
 	private def output = Future {
 		new Iterable[VirtualFile]() {
@@ -96,32 +95,59 @@ class ReactiveClient(input:Iterator[VirtualFile], target:ActorSelection) extends
 		log.debug("starting client {}...", self.path)
 
 		Future {
-			Thread.sleep(1000)
-			// start sending input
-			input foreach{vf => 
-				// fill in slots
-				slots.put(true)
+			try { 
+				Thread.sleep(1000)
+				// start sending input
+				input foreach{vf => 
+					// fill in slots
+					slots.put(true)
 
-				target ! Request(vf)
+					Tracer.withNewContext("request-trace") {
+						target ! Request(vf)
+					}
+				}
+
+				// send eof broadcast
+				Thread.sleep(1000)
+
+				target ! EOF()
+			} catch {
+			  	case e: Exception => e.printStackTrace()
 			}
-			// send eof broadcast
-			//target ! Request(VirtualFile.EOF())
-			Thread.sleep(1000)
-
-			target ! EOF()
 		}
 	}
 
-	override def postStop():Unit = log.debug("client {} stopped!!!", self.path)
+	override def postStop():Unit = {
+		Kamon.metrics.removeEntity(context.system.name + "_" + self.path.elements.mkString("_"), "reactive-client")
+
+		log.debug("client {} stopped!!!", self.path)
+	}
 
 	def receive = {
-		case Response(out) => Future {
-			// release a slot
-			//slots.take()
-			slots.poll()
+		case Response(out) => {
 
-			// add to queue
-			queue.put(out)
+			if(ReactiveStream.kamonEnabled) {
+				val tracerContext = Tracer.currentContext
+
+				val timestampAfterProcessing = RelativeNanoTimestamp.now
+				val processingTime = timestampAfterProcessing - tracerContext.startTimestamp
+
+				metrics.successTime.record(processingTime.nanos)
+
+				tracerContext.finish()
+			}
+
+			Future {
+				//tracerContext.finish()
+
+				//log.debug("got response {}", out.name)
+				
+				// release a slot
+				slots.poll()
+
+				// add to queue
+				queue.put(out)
+			}
 		}
 
 		case EOF() => Future {
@@ -143,10 +169,39 @@ class ReactiveClient(input:Iterator[VirtualFile], target:ActorSelection) extends
 			}
 		}
 
-		case Error(err) => log.error(err, "cannot process message at {}", sender.path)
+		case Error(err) => {
+			val session = sender
+			
+			if(ReactiveStream.kamonEnabled) {
+				val tracerContext = Tracer.currentContext
+
+				val timestampAfterProcessing = RelativeNanoTimestamp.now
+				val processingTime = timestampAfterProcessing - tracerContext.startTimestamp
+
+				metrics.errorTime.record(processingTime.nanos)
+				metrics.errors.increment()
+
+				tracerContext.finish()
+			}
+
+			Future {
+				// release a slot
+				slots.poll()
+
+				log.error(err, "cannot process message at {}", sender.path)
+			}
+		}
 
 		case Output() => { 
-			output pipeTo sender
+			val session = sender
+
+			Future {
+				output pipeTo session
+
+				log.debug("output sent to proxy")
+			}
 		}
+
+		case Pong() => log.debug("ping! pong!")
 	}
 }

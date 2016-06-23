@@ -24,6 +24,8 @@ import org.apache.commons.io.filefilter.FileFileFilter
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
 
+import xyz.rura.labs.util._
+
 object FileStreamFactory
 {
 	def src(globs:Array[String])(implicit system:ActorSystem):ReactiveStream = {
@@ -35,7 +37,16 @@ object FileStreamFactory
 			}
 		}, DirectoryFileFilter.DIRECTORY)
 
-		val vfs = files map{f => VirtualFile(f.getName(), f.getPath(), Some(VirtualFile.DEFAULT_ENCODING), new FileInputStream(f))}
+		val vfs = new Iterable[VirtualFile]() {
+			def iterator = files.iterator map{f => 
+				val in = new FileInputStream(f)
+				val vf = VirtualFile(f.getName(), f.getPath(), Some(VirtualFile.DEFAULT_ENCODING), IOUtils.toBufferedInputStream(in))
+
+				in.close()
+
+				vf
+			}
+		}
 
 		// return new AsyncStream(Promise.successful(vfs.iterator).future)
 		return new ReactiveStream(vfs)
@@ -155,7 +166,9 @@ object FileStreamFactory
 		return new ReactiveStream(input)
 	}
 
-	def dest(dirName:String):Mapper = new Mapper() {
+	def dest(dirName:String):ClassProps[Mapper] = ClassProps(classOf[FileStreamFactory.Dest], dirName)
+
+	final class Dest(dirName:String) extends AbstractMapper {
 		val dir = new File(dirName)
 
 		def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = {

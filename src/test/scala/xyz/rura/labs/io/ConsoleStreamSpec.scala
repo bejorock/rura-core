@@ -14,16 +14,22 @@ import akka.actor.Props
 
 import java.io.ByteArrayOutputStream
 
+import kamon.Kamon
+
 class ConsoleStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) with ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll
 {
+    System.setProperty("kamon.enable", "false")
+
     def this() = this(ActorSystem("ConsoleStreamSpec"))
 
     override def beforeAll = {
-
+        Kamon.start()
     }
 
     override def afterAll = {
         TestKit.shutdownActorSystem(system)
+
+        Kamon.shutdown()
         //system.terminate()
     }
 

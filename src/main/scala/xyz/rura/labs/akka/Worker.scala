@@ -1,4 +1,4 @@
-package xyz.rura.labs.akka
+/*package xyz.rura.labs.akka
 
 import akka.actor.Actor
 import akka.actor.ActorRef
@@ -115,4 +115,4 @@ class WorkerRefImpl(ref:ActorRef) extends WorkerRef
 
 		return (workerHub ? WorkerRequest(vf, mapBytes)).mapTo[VirtualFile]
 	}
-}
+}*/

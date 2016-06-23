@@ -40,8 +40,11 @@ import java.io.ByteArrayOutputStream
 import java.util.concurrent.LinkedBlockingQueue
 
 import xyz.rura.labs.io.reactive._
+import xyz.rura.labs.util._
 
-class ReactiveStream(iterable:Iterable[VirtualFile])(implicit val system:ActorSystem)
+import kamon.util.RelativeNanoTimestamp
+
+class ReactiveStream(iterable:Iterable[VirtualFile], streamName:String = ReactiveStream.defaultName)(implicit val system:ActorSystem)
 {
 	import ReactiveStream.{SetupWorker}
 	import system.dispatcher
@@ -50,6 +53,7 @@ class ReactiveStream(iterable:Iterable[VirtualFile])(implicit val system:ActorSy
 	private lazy val input = iterable.iterator
 	private lazy val mapBuffer = ListBuffer[ActorRef]()
 	
+	private var mapCounter = 0
 	private var expired = false
 	private var target:Option[ActorSelection] = None
 	private var targetPromise:Promise[Option[ActorSelection]] = null
@@ -61,25 +65,44 @@ class ReactiveStream(iterable:Iterable[VirtualFile])(implicit val system:ActorSy
 		def inputstream:InputStream = IOUtils.toInputStream(i)
 	}})
 
-	def pipe(mapper:Mapper):ReactiveStream = pipe(mapper, 1)
+	def pipe(mapperProps:ClassProps[_ <: Mapper]):ReactiveStream = pipe(mapperProps, 1)
 
-	def pipe(mapper:Mapper, num:Int):ReactiveStream = {
+	def pipe(mapperProps:ClassProps[_ <: Mapper], name:String):ReactiveStream = pipe(mapperProps, 1, name)
+
+	def pipe(mapperProps:ClassProps[_ <: Mapper], num:Int):ReactiveStream = pipe(mapperProps, num, None)
+
+	def pipe(mapperProps:ClassProps[_ <: Mapper], num:Int, name:String):ReactiveStream = pipe(mapperProps, num, Some(name))
+
+	def pipe(mapperProps:ClassProps[_ <: Mapper], num:Int, name:Option[String]):ReactiveStream = {
 		// create actorref
-		val ref = system.actorOf(Props(classOf[CommonReactiveWorker]).withMailbox("prio-mailbox"))
+		val ref = name match {
+			case None => {
+				mapCounter += 1
+
+				system.actorOf(Props(classOf[CommonReactiveWorker]).withMailbox("prio-mailbox"), s"$streamName-map$mapCounter")
+			}
+			case Some(n) => system.actorOf(Props(classOf[CommonReactiveWorker]).withMailbox("prio-mailbox"), n)
+		}
 
 		// append to buffer
 		mapBuffer += ref
 
-		return pipe(mapper, system.actorSelection(ref.path), num)
+		return pipe(mapperProps, system.actorSelection(ref.path), num)
 	}
 
-	def pipe(cmap:(VirtualFile, (VirtualFile, Exception) => Unit) => Unit, num:Int):ReactiveStream = pipe(new Mapper() {
+	def pipe(cmap:(VirtualFile, (VirtualFile, Exception) => Unit) => Unit, num:Int):ReactiveStream = pipe(ClassProps[Mapper](new AbstractMapper() {
 		override def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = cmap(f, callback)
-	}, num)
+	}), num)
+
+	def pipe(cmap:(VirtualFile, (VirtualFile, Exception) => Unit) => Unit, num:Int, name:String):ReactiveStream = pipe(ClassProps[Mapper](new AbstractMapper() {
+		override def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = cmap(f, callback)
+	}), num, name)
+
+	def pipe(cmap:(VirtualFile, (VirtualFile, Exception) => Unit) => Unit, name:String):ReactiveStream = pipe(cmap, 1, name)
 
 	def pipe(cmap:(VirtualFile, (VirtualFile, Exception) => Unit) => Unit):ReactiveStream = pipe(cmap, 1)
 
-	def pipe(mapper:Mapper, worker:ActorSelection, num:Int):ReactiveStream = {
+	def pipe(mapperProps:ClassProps[_ <: Mapper], worker:ActorSelection, num:Int):ReactiveStream = {
 		if(expired) {
 			throw new Exception("this builder has expired")
 		}
@@ -95,17 +118,17 @@ class ReactiveStream(iterable:Iterable[VirtualFile])(implicit val system:ActorSy
 		val targetFuture = targetPromise.future
 		Future {
 			// setup worker
-			worker ! SetupWorker(mapper, Await.result(targetFuture, Duration.Inf), num)
+			worker ! SetupWorker(mapperProps, Await.result(targetFuture, Duration.Inf), num)
 		}
 
 		return this
 	}
 
-	def pipe(mapper:Mapper, worker:ActorSelection):ReactiveStream = pipe(mapper, worker, 1)
+	def pipe(mapperProps:ClassProps[_ <: Mapper], worker:ActorSelection):ReactiveStream = pipe(mapperProps, worker, 1)
 
-	def pipe(cmap:(VirtualFile, (VirtualFile, Exception) => Unit) => Unit, worker:ActorSelection, num:Int):ReactiveStream = pipe(new Mapper() {
+	def pipe(cmap:(VirtualFile, (VirtualFile, Exception) => Unit) => Unit, worker:ActorSelection, num:Int):ReactiveStream = pipe(ClassProps[Mapper](new AbstractMapper() {
 		override def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = cmap(f, callback)
-	}, worker, num)
+	}), worker, num)
 
 	def pipe(cmap:(VirtualFile, (VirtualFile, Exception) => Unit) => Unit, worker:ActorSelection):ReactiveStream = pipe(cmap, worker, 1)
 
@@ -132,8 +155,8 @@ class ReactiveStream(iterable:Iterable[VirtualFile])(implicit val system:ActorSy
 
 			case Some(t) => {
 				// define client
-				val client = system.actorOf(Props(classOf[ReactiveClient], input, target.get).withMailbox("prio-mailbox"))
-				val proxy = TypedActor(system).typedActorOf(TypedProps(classOf[ReactiveProxy], new ReactiveProxyImpl(client)).withTimeout(ReactiveStream.defaultTimeout))
+				val client = system.actorOf(Props(classOf[ReactiveClient], input, target.get).withMailbox("prio-mailbox"), s"$streamName-client")
+				val proxy = TypedActor(system).typedActorOf(TypedProps(classOf[ReactiveProxy], new ReactiveProxyImpl(client)).withTimeout(ReactiveStream.defaultTimeout), s"$streamName-proxy")
 				val outputFuture = proxy.output
 
 				outputFuture onSuccess {
@@ -158,13 +181,33 @@ class ReactiveStream(iterable:Iterable[VirtualFile])(implicit val system:ActorSy
 object ReactiveStream
 {
 	final case class Request(vf:VirtualFile)
+	final case class DelegateRequest(vf:VirtualFile, session:ActorRef, nextTarget:Option[ActorSelection])
 	final case class EOF()
 	final case class Response(out:VirtualFile)
 	final case class Error(err:Throwable)
 	final case class Output()
-	final case class SetupWorker(mapper:Mapper, nextTarget:Option[ActorSelection], num:Int)
+	final case class SetupWorker(mapperProps:ClassProps[_ <: Mapper], nextTarget:Option[ActorSelection], num:Int)
 	final case class ResetWorker(eofOrigin:Boolean)
 	final case class WorkerNotReady(request:Request)
+	final case class Ping()
+	final case class Pong()
 
 	implicit def defaultTimeout:Timeout = Timeout(5 minutes)
+
+	private var counter = 0
+	
+	def defaultName:String = {
+		counter += 1
+
+		return s"reactivestream$counter"
+	}
+
+	def kamonEnabled:Boolean = {
+		// default enable kamon
+		if(System.getProperty("kamon.enable") == null) {
+			return true
+		} else {
+			return System.getProperty("kamon.enable").toBoolean
+		}
+	}
 }
