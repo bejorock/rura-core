@@ -23,13 +23,13 @@ class ConsoleStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem
     def this() = this(ActorSystem("ConsoleStreamSpec"))
 
     override def beforeAll = {
-        Kamon.start()
+        //Kamon.start()
     }
 
     override def afterAll = {
         TestKit.shutdownActorSystem(system)
 
-        Kamon.shutdown()
+        //Kamon.shutdown()
         //system.terminate()
     }
 

@@ -10,7 +10,7 @@ import com.typesafe.config.Config
 
 import xyz.rura.labs.io._
 
-import ReactiveStream.{Request, Response, EOF, SetupWorker}
+import ReactiveStream.{Request, Response, EOF, SetupWorker, Error}
 
 import scala.concurrent.duration._
 
@@ -19,6 +19,7 @@ class ReactiveMailbox(settings:ActorSystem.Settings, config:Config) extends Unbo
 	case SetupWorker(mapperProps, nextTarget, num) => 0
 	case Request(vf) => 1
 	case Response(out) => 2
+	case Error(err) => 2
 
 	// low priority
 	case EOF() => 4
@@ -35,6 +36,7 @@ class BoundedReactiveMailbox(settings:ActorSystem.Settings, config:Config) exten
 	case SetupWorker(mapperProps, nextTarget, num) => 0
 	case Request(vf) => 1
 	case Response(out) => 2
+	case Error(err) => 2
 
 	// low priority
 	case EOF() => 4

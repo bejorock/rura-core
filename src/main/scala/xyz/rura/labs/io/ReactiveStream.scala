@@ -59,10 +59,15 @@ class ReactiveStream(iterable:Iterable[VirtualFile], streamName:String = Reactiv
 	private var targetPromise:Promise[Option[ActorSelection]] = null
 
 	def this(it:String*)(implicit s:ActorSystem) = this(it.map{i => new VirtualFile(){
+		var _processingTime = 0l
+
 		def name:String = i
 		def path:String = "temp/" + i
 		def encoding:Option[String] = Some(VirtualFile.DEFAULT_ENCODING)
 		def inputstream:InputStream = IOUtils.toInputStream(i)
+
+		def trace(startTime:Long):Unit = _processingTime = System.nanoTime() - startTime
+		def processingTime:Long = _processingTime
 	}})
 
 	def pipe(mapperProps:ClassProps[_ <: Mapper]):ReactiveStream = pipe(mapperProps, 1)
