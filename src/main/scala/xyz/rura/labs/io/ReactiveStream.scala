@@ -165,7 +165,7 @@ class ReactiveStream(iterable:Iterable[VirtualFile], streamName:String = Reactiv
 				val outputFuture = proxy.output
 
 				outputFuture onSuccess {
-					case output => output onComplete{() =>
+					case output => output onComplete{
 						// stop client
 						client ! PoisonPill.getInstance
 						// stop proxy

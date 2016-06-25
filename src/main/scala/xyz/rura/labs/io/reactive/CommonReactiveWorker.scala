@@ -81,12 +81,12 @@ class CommonReactiveWorker extends AbstractReactiveWorker
 		log.debug("all child has done processing messages")
 	}
 
-	def addProcess(f:Future[Boolean]):Unit = synchronized {
+	def addProcess(f:Future[Boolean]):Unit = processes.synchronized {
 		// assign to be recent executed process
 		processes += f
 	}
 
-	def removeProcess(f:Future[Boolean]):Unit = synchronized {
+	def removeProcess(f:Future[Boolean]):Unit = processes.synchronized {
 		// remove future from processes buffer
 		processes -= f
 	}
@@ -98,9 +98,22 @@ class CommonReactiveWorker extends AbstractReactiveWorker
 		val session = sender
 		val sessionTarget = nextTarget
 		try { 
-		  	val reqFuture:Future[Boolean] = mapper match {
+		  	mapper match {
 		  		// post request to childs
-		  		case None => Await.result((childs ? DelegateRequest(vf, session, sessionTarget)).mapTo[Future[Boolean]], Duration.Inf)
+		  		case None => (childs ? DelegateRequest(vf, session, sessionTarget)) onSuccess{
+		  			case reqFuture:Future[Any] => {
+		  				addProcess(reqFuture.mapTo[Boolean])
+
+						reqFuture onComplete {
+							case Success(data) => removeProcess(reqFuture.mapTo[Boolean])
+							case Failure(err) => {
+								session ! Error(err)
+
+								removeProcess(reqFuture.mapTo[Boolean])
+							}
+						}
+		  			}
+		  		}
 
 		  		// do the work by itself
 		  		case Some(mapperInstance) => {
@@ -117,20 +130,9 @@ class CommonReactiveWorker extends AbstractReactiveWorker
 						}
 					})
 
-					Promise.successful(true).future
+					//Promise.successful(true).future
 		  		}
 		  	}
-
-			addProcess(reqFuture)
-
-			reqFuture onComplete {
-				case Success(data) => removeProcess(reqFuture)
-				case Failure(err) => {
-					session ! Error(err)
-
-					removeProcess(reqFuture)
-				}
-			}
 		} catch {
 			case e: ReactiveException => session ! Error(e)
 		  	case e: Exception => session ! Error(new ReactiveException(vf, e))

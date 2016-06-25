@@ -14,7 +14,7 @@ scalaVersion := "2.11.7"
 
 libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "2.2.4" % "test",
-  "org.apache.httpcomponents" % "httpclient" % "4.5.2",
+  "org.apache.httpcomponents" % "httpclient" % "4.5.2" exclude("commons-logging", "commons-logging"),
   "org.jsoup" % "jsoup" % "1.8.3",
   "com.typesafe.play" %% "play-json" % "2.5.0",
   "commons-io" % "commons-io" % "2.4",
@@ -28,8 +28,9 @@ libraryDependencies ++= Seq(
   "io.kamon" %% "kamon-akka-remote" % "0.6.0",
   //"io.kamon" %% "kamon-log-reporter" % "0.6.0",
   //"io.kamon" %% "kamon-system-metrics" % "0.6.0",
-  "org.slf4j" % "slf4j-nop" % "1.7.21",
-  "org.mongodb" %% "casbah" % "3.1.1")
+  //"org.slf4j" % "slf4j-nop" % "1.7.21",
+  "org.mongodb" %% "casbah" % "3.1.1",
+  "org.slf4j" % "jcl-over-slf4j" % "1.7.21")
 
 scalacOptions in Compile := Vector("-Ywarn-infer-any", "-Ywarn-unused-import")
 

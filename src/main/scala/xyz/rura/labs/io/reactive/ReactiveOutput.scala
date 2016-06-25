@@ -63,7 +63,7 @@ trait ReactiveOutput extends Serializable
 
 	def blocking:ReactiveOutput
 
-	def onComplete(code: () => Unit):Unit
+	def onComplete(code: => Unit):Unit
 	private[reactive] def triggerComplete:Unit
 
 	private[reactive] def put(vf:VirtualFile):Unit
@@ -80,7 +80,7 @@ class DirectReactiveOutput(iterable:Iterable[VirtualFile]) extends ReactiveOutpu
 
 	def blocking:ReactiveOutput = this
 
-	def onComplete(code: () => Unit):Unit = code()
+	def onComplete(code: => Unit):Unit = code
 	private[reactive] def triggerComplete:Unit = {}
 
 	private[reactive] def put(vf:VirtualFile):Unit = {}
@@ -92,14 +92,16 @@ class IndirectReactiveOutput(implicit ec:ExecutionContextExecutor) extends React
 {
 	private val DEFAULT_TIMEOUT = 5
 
-	private var isComplete = false
+	//private var isComplete = false
 	private var timeout = DEFAULT_TIMEOUT // seconds
 	private val resultQueue = new ArrayBlockingQueue[VirtualFile](10000)
 	private val errorQueue = new ArrayBlockingQueue[ReactiveException](10000)
 
 	private val _resultCache = Promise[Iterable[VirtualFile]]()
 	private val _errorCache = Promise[Iterable[ReactiveException]]()
-	private val _completeCache = ListBuffer[() => Unit]()
+	private val _complete = Promise[Boolean]()
+	private val _completeFuture = _complete.future
+	//private val _completeCache = ListBuffer[() => Unit]()
 
 	// setup output cache
 	Future {
@@ -180,16 +182,20 @@ class IndirectReactiveOutput(implicit ec:ExecutionContextExecutor) extends React
 		return this
 	}
 
-	def onComplete(code: () => Unit):Unit = synchronized {
-		if(isComplete) {
-			code()
+	def onComplete(code: => Unit):Unit = synchronized {
+		if(_completeFuture.isCompleted) {
+			code
 		} else {
-			_completeCache += code
+			_completeFuture onSuccess {
+				case status => code
+			}
 		}
 	}
+
 	private[reactive] def triggerComplete:Unit = synchronized {
-		isComplete = true
-		_completeCache foreach{code => code()}
+		//isComplete = true
+		//_completeCache foreach{code => code()}
+		_complete success true
 	}
 
 	private[reactive] def put(vf:VirtualFile):Unit = resultQueue.synchronized {

@@ -20,15 +20,15 @@ import xyz.rura.labs.io._
 object Main
 {
 	def main(args:Array[String]):Unit = {
-		System.setProperty("kamon.enable", "false")
+		//System.setProperty("kamon.enable", "false")
 
-		//Kamon.start()
+		Kamon.start()
 
 		implicit val system = ActorSystem("ReactiveStreamSpec")
 		implicit val ec = system.dispatcher
 
 		def dummyData = new Iterable[VirtualFile]() {
-			def iterator = Iterator.fill(1000){
+			def iterator = Iterator.continually{
 				val content = scala.util.Random.alphanumeric.take(5).mkString
 
     			VirtualFile(content, ".", Some(VirtualFile.DEFAULT_ENCODING), IOUtils.toInputStream(content))
@@ -49,25 +49,37 @@ object Main
 
 		// create stream
 		val streamFuture = new ReactiveStream(dummyData).pipe((vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => {
+			//factorial(1000)
 			for(i <- 1 to 5) {
 				//factorial(1000)
 				callback(VirtualFile(vf.name + "-xoxo", vf.path, vf.encoding, vf.inputstream), null)
 			}
+
+			//Thread.sleep(100)
 		}, 1, "step1").pipe((vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => {
+			//factorial(2000)
 			for(i <- 1 to 10) {
 				//factorial(1000)
 				callback(VirtualFile(vf.name + "-xdxd", vf.path, vf.encoding, vf.inputstream), null)
 			}
+
+			Thread.sleep(10)
 		}, 5, "step2").pipe((vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => {
+			//factorial(3000)
 			for(i <- 1 to 10) {
 				//factorial(1000)
 				callback(VirtualFile(vf.name + "-yoyo", vf.path, vf.encoding, vf.inputstream), null)
 			}
+
+			Thread.sleep(50)
 		}, 10, "step3").pipe((vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => {
+			//factorial(4000)
 			for(i <- 1 to 10) {
 				//factorial(1000)
 				callback(VirtualFile(vf.name + "-wkwk", vf.path, vf.encoding, vf.inputstream), null)
 			}
+
+			Thread.sleep(100)
 		}, 15, "step4").toStream
 
 		val stream = Await.result(streamFuture, Duration.Inf).nonBlocking
@@ -107,10 +119,10 @@ object Main
 			}
 		}
 
-		stream onComplete{() => 
+		stream onComplete{
 			system.shutdown()
 
-			//Kamon.shutdown()
+			Kamon.shutdown()
 		}
 	}
 }

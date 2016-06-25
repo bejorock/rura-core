@@ -56,6 +56,8 @@ abstract class AbstractReactiveWorker extends Actor with ActorLogging
 
 	def notReady(vf:VirtualFile):Unit = {}
 
+	def otherwise(_otherwise:AnyRef):Unit = {}
+
 	final def receive = synchronized {
 		case SetupWorker(mapperProps, nextTarget, num) => {
 			// do worker initial setup
@@ -73,6 +75,9 @@ abstract class AbstractReactiveWorker extends Actor with ActorLogging
 		}
 
 		case Ping() => sender ! Pong()
+
+		// hande otherwise messages
+		case _otherwise:AnyRef => otherwise(_otherwise)
 	}
 
 	final def active:Receive = synchronized {
@@ -94,5 +99,8 @@ abstract class AbstractReactiveWorker extends Actor with ActorLogging
 		}
 
 		case Ping() => sender ! Pong()
+
+		// hande otherwise messages
+		case _otherwise:AnyRef => otherwise(_otherwise)
 	}
 }

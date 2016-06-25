@@ -46,4 +46,4 @@ class BoundedReactiveMailbox(settings:ActorSystem.Settings, config:Config) exten
 
 	// mid priority
 	case otherwise => 3
-}, 1000, 10 minutes)
+}, 100, 5 minutes)
