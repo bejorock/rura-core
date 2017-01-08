@@ -103,10 +103,12 @@ class HttpStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) w
         }
 
         "watch a {url} for a {duration}" in {
-            val factory = HttpStreamFactory.watch("http://localhost/api/dummy.json", client, 1 minutes, 10000).pipe{(vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => 
-                val json = Json.parse(IOUtils.toString(vf.inputstream)).asInstanceOf[JsObject] + ("name" -> JsString("rana loda tama"))
+            val factory = HttpStreamFactory.watch("http://localhost/api/dummy.json", client, 1 minutes, 10000).pipe(){
+                case (vf, output) => {
+                    val json = Json.parse(IOUtils.toString(vf.inputstream)).asInstanceOf[JsObject] + ("name" -> JsString("rana loda tama"))
 
-                callback(VirtualFile(vf.name, vf.path, vf.encoding, IOUtils.toInputStream(json.toString)), null)
+                    output.collect(VirtualFile(vf.name, vf.path, vf.encoding, IOUtils.toInputStream(json.toString)))
+                }
             }
 
             var counter = 0l

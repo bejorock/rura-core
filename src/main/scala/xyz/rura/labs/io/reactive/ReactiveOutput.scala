@@ -88,14 +88,12 @@ class DirectReactiveOutput(iterable:Iterable[VirtualFile]) extends ReactiveOutpu
 	private[reactive] def put(err:ReactiveException):Unit = {}
 }
 
-class IndirectReactiveOutput(implicit ec:ExecutionContextExecutor) extends ReactiveOutput
+class IndirectReactiveOutput(DEFAULT_TIMEOUT:Int, maxResultCache:Int, maxErrorCache:Int)(implicit ec:ExecutionContextExecutor) extends ReactiveOutput
 {
-	private val DEFAULT_TIMEOUT = 5
-
 	//private var isComplete = false
 	private var timeout = DEFAULT_TIMEOUT // seconds
-	private val resultQueue = new ArrayBlockingQueue[VirtualFile](10000)
-	private val errorQueue = new ArrayBlockingQueue[ReactiveException](10000)
+	private val resultQueue = new ArrayBlockingQueue[VirtualFile](maxResultCache)
+	private val errorQueue = new ArrayBlockingQueue[ReactiveException](maxErrorCache)
 
 	private val _resultCache = Promise[Iterable[VirtualFile]]()
 	private val _errorCache = Promise[Iterable[ReactiveException]]()

@@ -56,14 +56,17 @@ import kamon.metric.instrument.Time
 import kamon.util.RelativeNanoTimestamp
 import kamon.util.NanoInterval
 
-class ReactiveClient(input:Iterator[VirtualFile], target:ActorSelection) extends Actor with ActorLogging
+class  ReactiveClient(input:Iterator[VirtualFile], target:ActorSelection) extends Actor with ActorLogging
 {
 	import ReactiveStream.{Request, Response, Error, Output, WorkerNotReady, EOF, Ping, Pong}
-	import context.dispatcher
+	//import context.dispatcher
+
+	private implicit val ec = context.system.dispatchers.lookup("rura.akka.dispatcher.threadpool.simple")
 
 	// output cache
-	private lazy val output:ReactiveOutput = new IndirectReactiveOutput()
-	private lazy val slots = new ArrayBlockingQueue[Boolean](1000)
+	private lazy val config = context.system.settings.config
+	private lazy val output:ReactiveOutput = new IndirectReactiveOutput(config.getInt("rura.reactive-stream.output.cache-timeout"), config.getInt("rura.reactive-stream.output.max-result-cache"), config.getInt("rura.reactive-stream.output.max-error-cache"))
+	private lazy val slots = new ArrayBlockingQueue[Boolean](config.getInt("rura.reactive-stream.client.input-slots"))
 	private lazy val metrics = Kamon.metrics.entity(ReactiveClientMetrics, context.system.name + "_" + self.path.elements.mkString("_"))
 
 	override def preStart():Unit = {

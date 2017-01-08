@@ -1,16 +1,10 @@
 name := """rura-core"""
 
-version := "1.0"
+organization := "xyz.rura.labs"
+
+version := "0.0.1"
 
 scalaVersion := "2.11.7"
-
-//javaHome := Some(file("/Library/Java/JavaVirtualMachines/jdk1.8.0_60.jdk/Contents/Home"))
-
-// Change this to another test framework if you prefer
-//libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.4" % "test"
-
-// Uncomment to use Akka
-//libraryDependencies += "com.typesafe.akka" %% "akka-actor" % "2.3.11"
 
 libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "2.2.4" % "test",
@@ -34,12 +28,4 @@ libraryDependencies ++= Seq(
 
 scalacOptions in Compile := Vector("-Ywarn-infer-any", "-Ywarn-unused-import")
 
-//aspectjSettings
-
-//javaOptions in (Test, run) <++= AspectjKeys.weaverOptions in Aspectj
-
-//javaOptions in testOnly <++= AspectjKeys.weaverOptions in Aspectj
-
-//fork in (Test, run) := true
-
-//fork in test := true
+publishTo := Some(Resolver.file("ranalubis-dropbox", new File(Path.userHome.absolutePath+"/Dropbox/M2")))

@@ -25,7 +25,8 @@ object Main
 		Kamon.start()
 
 		implicit val system = ActorSystem("ReactiveStreamSpec")
-		implicit val ec = system.dispatcher
+		//implicit val ec = system.dispatcher
+		implicit val ec = system.dispatchers.lookup("rura.akka.dispatcher.threadpool.simple")
 
 		def dummyData = new Iterable[VirtualFile]() {
 			def iterator = Iterator.continually{
@@ -48,39 +49,47 @@ object Main
 		val startTime = java.lang.System.currentTimeMillis()
 
 		// create stream
-		val streamFuture = new ReactiveStream(dummyData).pipe((vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => {
-			//factorial(1000)
-			for(i <- 1 to 5) {
+		val streamFuture = new ReactiveStream(dummyData).pipe("step1"){
+			case (vf, output) => {
 				//factorial(1000)
-				callback(VirtualFile(vf.name + "-xoxo", vf.path, vf.encoding, vf.inputstream), null)
-			}
+				for(i <- 1 to 5) {
+					//factorial(1000)
+					output.collect(VirtualFile(vf.name + "-xoxo", vf.path, vf.encoding, vf.inputstream))
+				}
 
-			//Thread.sleep(100)
-		}, 1, "step1").pipe((vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => {
-			//factorial(2000)
-			for(i <- 1 to 10) {
-				//factorial(1000)
-				callback(VirtualFile(vf.name + "-xdxd", vf.path, vf.encoding, vf.inputstream), null)
+				//Thread.sleep(100)
 			}
+		}.pipe(5, "step2"){
+			case (vf, output) => {
+				//factorial(2000)
+				for(i <- 1 to 10) {
+					//factorial(1000)
+					output.collect(VirtualFile(vf.name + "-xdxd", vf.path, vf.encoding, vf.inputstream))
+				}
 
-			Thread.sleep(10)
-		}, 5, "step2").pipe((vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => {
-			//factorial(3000)
-			for(i <- 1 to 10) {
-				//factorial(1000)
-				callback(VirtualFile(vf.name + "-yoyo", vf.path, vf.encoding, vf.inputstream), null)
+				Thread.sleep(10)
 			}
+		}.pipe(10, "step3"){
+			case (vf, output) => {
+				//factorial(3000)
+				for(i <- 1 to 10) {
+					//factorial(1000)
+					output.collect(VirtualFile(vf.name + "-yoyo", vf.path, vf.encoding, vf.inputstream))
+				}
 
-			Thread.sleep(50)
-		}, 10, "step3").pipe((vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => {
-			//factorial(4000)
-			for(i <- 1 to 10) {
-				//factorial(1000)
-				callback(VirtualFile(vf.name + "-wkwk", vf.path, vf.encoding, vf.inputstream), null)
+				Thread.sleep(50)
 			}
+		}.pipe(15, "step4"){
+			case (vf, output) => {
+				//factorial(4000)
+				for(i <- 1 to 10) {
+					//factorial(1000)
+					output.collect(VirtualFile(vf.name + "-wkwk", vf.path, vf.encoding, vf.inputstream))
+				}
 
-			Thread.sleep(100)
-		}, 15, "step4").toStream
+				Thread.sleep(100)
+			}
+		}.toStream
 
 		val stream = Await.result(streamFuture, Duration.Inf).nonBlocking
 

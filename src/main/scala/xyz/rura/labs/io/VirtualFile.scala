@@ -44,4 +44,16 @@ object VirtualFile
 		def trace(startTime:Long):Unit = _processingTime = System.nanoTime() - startTime
 		def processingTime:Long = _processingTime
 	}
+
+	def apply(n:String, p:String, i:InputStream) = new VirtualFile() {
+		var _processingTime = 0l
+
+		def name:String = n
+		def path:String = p
+		def encoding:Option[String] = None
+		def inputstream:InputStream = i
+
+		def trace(startTime:Long):Unit = _processingTime = System.nanoTime() - startTime
+		def processingTime:Long = _processingTime
+	}
 }

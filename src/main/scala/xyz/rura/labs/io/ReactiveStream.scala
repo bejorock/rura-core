@@ -47,7 +47,9 @@ import kamon.util.RelativeNanoTimestamp
 class ReactiveStream(iterable:Iterable[VirtualFile], streamName:String = ReactiveStream.defaultName)(implicit val system:ActorSystem)
 {
 	import ReactiveStream.{SetupWorker}
-	import system.dispatcher
+	//import system.dispatcher
+
+	private implicit val ec = system.dispatchers.lookup("rura.akka.dispatcher.threadpool.simple")
 
 	private lazy val log = Logging(system, this.getClass) //LoggerFactory.getLogger(classOf[ReactiveStream])
 	private lazy val input = iterable.iterator
@@ -57,18 +59,6 @@ class ReactiveStream(iterable:Iterable[VirtualFile], streamName:String = Reactiv
 	private var expired = false
 	private var target:Option[ActorSelection] = None
 	private var targetPromise:Promise[Option[ActorSelection]] = null
-
-	def this(it:String*)(implicit s:ActorSystem) = this(it.map{i => new VirtualFile(){
-		var _processingTime = 0l
-
-		def name:String = i
-		def path:String = "temp/" + i
-		def encoding:Option[String] = Some(VirtualFile.DEFAULT_ENCODING)
-		def inputstream:InputStream = IOUtils.toInputStream(i)
-
-		def trace(startTime:Long):Unit = _processingTime = System.nanoTime() - startTime
-		def processingTime:Long = _processingTime
-	}})
 
 	def pipe(mapperProps:ClassProps[_ <: Mapper]):ReactiveStream = pipe(mapperProps, 1)
 
@@ -84,9 +74,9 @@ class ReactiveStream(iterable:Iterable[VirtualFile], streamName:String = Reactiv
 			case None => {
 				mapCounter += 1
 
-				system.actorOf(Props(classOf[CommonReactiveWorker]).withMailbox("prio-mailbox"), s"$streamName-map$mapCounter")
+				system.actorOf(Props(classOf[CommonReactiveWorker]).withMailbox("rura.akka.mailbox.bounded-priority").withDispatcher("rura.akka.dispatcher.forkjoin.mainactor"), s"$streamName-map$mapCounter")
 			}
-			case Some(n) => system.actorOf(Props(classOf[CommonReactiveWorker]).withMailbox("prio-mailbox"), n)
+			case Some(n) => system.actorOf(Props(classOf[CommonReactiveWorker]).withDispatcher("rura.akka.dispatcher.forkjoin.mainactor").withMailbox("rura.akka.mailbox.bounded-priority"), n)
 		}
 
 		// append to buffer
@@ -95,17 +85,20 @@ class ReactiveStream(iterable:Iterable[VirtualFile], streamName:String = Reactiv
 		return pipe(mapperProps, system.actorSelection(ref.path), num)
 	}
 
-	def pipe(cmap:(VirtualFile, (VirtualFile, Exception) => Unit) => Unit, num:Int):ReactiveStream = pipe(ClassProps[Mapper](new AbstractMapper() {
-		override def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = cmap(f, callback)
+	//def pipe(cmap:(VirtualFile, (VirtualFile, Exception) => Unit) => Unit, num:Int)
+
+	def pipe(num:Int)(cmap:PartialFunction[(VirtualFile, MapperOutput), Unit]):ReactiveStream = pipe(ClassProps[Mapper](new AbstractMapper() {
+		//override def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = cmap(f, callback)
+		def map(f:VirtualFile, output:MapperOutput):Unit = cmap(f -> output)
 	}), num)
 
-	def pipe(cmap:(VirtualFile, (VirtualFile, Exception) => Unit) => Unit, num:Int, name:String):ReactiveStream = pipe(ClassProps[Mapper](new AbstractMapper() {
-		override def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = cmap(f, callback)
+	def pipe(num:Int, name:String)(cmap:PartialFunction[(VirtualFile, MapperOutput), Unit]):ReactiveStream = pipe(ClassProps[Mapper](new AbstractMapper() {
+		def map(f:VirtualFile, output:MapperOutput):Unit = cmap(f -> output)
 	}), num, name)
 
-	def pipe(cmap:(VirtualFile, (VirtualFile, Exception) => Unit) => Unit, name:String):ReactiveStream = pipe(cmap, 1, name)
+	def pipe(name:String)(cmap:PartialFunction[(VirtualFile, MapperOutput), Unit]):ReactiveStream = pipe(1, name)(cmap)
 
-	def pipe(cmap:(VirtualFile, (VirtualFile, Exception) => Unit) => Unit):ReactiveStream = pipe(cmap, 1)
+	def pipe()(cmap:PartialFunction[(VirtualFile, MapperOutput), Unit]):ReactiveStream = pipe(1)(cmap)
 
 	def pipe(mapperProps:ClassProps[_ <: Mapper], worker:ActorSelection, num:Int):ReactiveStream = {
 		if(expired) {
@@ -131,11 +124,11 @@ class ReactiveStream(iterable:Iterable[VirtualFile], streamName:String = Reactiv
 
 	def pipe(mapperProps:ClassProps[_ <: Mapper], worker:ActorSelection):ReactiveStream = pipe(mapperProps, worker, 1)
 
-	def pipe(cmap:(VirtualFile, (VirtualFile, Exception) => Unit) => Unit, worker:ActorSelection, num:Int):ReactiveStream = pipe(ClassProps[Mapper](new AbstractMapper() {
-		override def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = cmap(f, callback)
+	def pipe(worker:ActorSelection, num:Int)(cmap:PartialFunction[(VirtualFile, MapperOutput), Unit]):ReactiveStream = pipe(ClassProps[Mapper](new AbstractMapper() {
+		def map(f:VirtualFile, output:MapperOutput):Unit = cmap(f -> output)
 	}), worker, num)
 
-	def pipe(cmap:(VirtualFile, (VirtualFile, Exception) => Unit) => Unit, worker:ActorSelection):ReactiveStream = pipe(cmap, worker, 1)
+	def pipe(worker:ActorSelection)(cmap:PartialFunction[(VirtualFile, MapperOutput), Unit]):ReactiveStream = pipe(worker, 1)(cmap)
 
 	def isExpired = expired
 
@@ -160,8 +153,8 @@ class ReactiveStream(iterable:Iterable[VirtualFile], streamName:String = Reactiv
 
 			case Some(t) => {
 				// define client
-				val client = system.actorOf(Props(classOf[ReactiveClient], input, target.get).withMailbox("prio-mailbox"), s"$streamName-client")
-				val proxy = TypedActor(system).typedActorOf(TypedProps(classOf[ReactiveProxy], new ReactiveProxyImpl(client)).withTimeout(ReactiveStream.defaultTimeout), s"$streamName-proxy")
+				val client = system.actorOf(Props(classOf[ReactiveClient], input, target.get).withMailbox("rura.akka.mailbox.bounded-priority").withDispatcher("rura.akka.dispatcher.forkjoin.mainactor"), s"$streamName-client")
+				val proxy = TypedActor(system).typedActorOf(TypedProps(classOf[ReactiveProxy], new ReactiveProxyImpl(client)).withTimeout(ReactiveStream.defaultTimeout).withDispatcher("rura.akka.dispatcher.forkjoin.mainactor"), s"$streamName-proxy")
 				val outputFuture = proxy.output
 
 				outputFuture onSuccess {

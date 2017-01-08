@@ -55,7 +55,8 @@ object FileStreamFactory
 	def src(glob:String)(implicit system:ActorSystem):ReactiveStream = src(Array(glob))
 
 	def watch(globs:Array[String], duration:Duration)(implicit system:ActorSystem):ReactiveStream = {
-		import system.dispatcher
+		//import system.dispatcher
+		implicit val ec = system.dispatchers.lookup("rura.akka.dispatcher.threadpool.simple")
 
 		// setup watcher
 		val watcher = FileSystems.getDefault().newWatchService()
@@ -171,14 +172,15 @@ object FileStreamFactory
 	final class Dest(dirName:String) extends AbstractMapper {
 		val dir = new File(dirName)
 
-		def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = {
+		def map(f:VirtualFile, output:MapperOutput):Unit = {
 			val file = new File(dirName, f.name)
 			val out = new FileOutputStream(file)
 			
 			IOUtils.copy(f.inputstream, out)
 			out.close()
 
-			callback(f, null)
+			// should not return anything
+			output.collect(f)
 		}
 	}
 }

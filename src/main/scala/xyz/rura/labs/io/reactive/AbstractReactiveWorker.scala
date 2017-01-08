@@ -44,7 +44,9 @@ import xyz.rura.labs.util._
 abstract class AbstractReactiveWorker extends Actor with ActorLogging
 {
 	import ReactiveStream.{Request, Response, Error, SetupWorker, ResetWorker, WorkerNotReady, defaultTimeout, EOF, Ping, Pong}
-	import context.dispatcher
+	//import context.dispatcher
+
+	private implicit val ec = context.system.dispatchers.lookup("rura.akka.dispatcher.threadpool.simple")
 
 	def eof():Unit = {}
 

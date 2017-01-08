@@ -54,14 +54,16 @@ import kamon.trace.Tracer
 class CommonReactiveWorker extends AbstractReactiveWorker
 {
 	import ReactiveStream.{Request, DelegateRequest, Response, Error, SetupWorker, ResetWorker, WorkerNotReady, EOF, defaultTimeout}
-	import context.dispatcher
+	//import context.dispatcher
 
 	//implicit val timeout = Timeout(1 hour)
+	private implicit val ec = context.system.dispatchers.lookup("rura.akka.dispatcher.threadpool.simple")
 
-	private val processes = ListBuffer[Future[Boolean]]()
+	//private val processes = ListBuffer[Future[Boolean]]()
 
 	private var childs = ActorRef.noSender
 	private var nextTarget = Option.empty[ActorSelection]
+	private var terminatePromise = Promise[Boolean]()
 
 	// for single worker only
 	private var mapper:Option[Mapper] = None
@@ -71,66 +73,28 @@ class CommonReactiveWorker extends AbstractReactiveWorker
 	override def postStop():Unit = log.debug("worker {} stopped!!!", self.path)
 
 	override def eof() = {
-		log.debug("trying to stop {} slave process", processes.size)
-
-		if(processes.size > 0) {
-			// wait for all processes to complete
-			Await.ready(Future.sequence(processes.toList), Duration.Inf)
-		}
-
-		log.debug("all child has done processing messages")
-	}
-
-	def addProcess(f:Future[Boolean]):Unit = processes.synchronized {
-		// assign to be recent executed process
-		processes += f
-	}
-
-	def removeProcess(f:Future[Boolean]):Unit = processes.synchronized {
-		// remove future from processes buffer
-		processes -= f
+		
 	}
 
 	def request(vf:VirtualFile) = {
-		//log.debug(Tracer.currentContext.name + "_" + Tracer.currentContext.token)
-
 		// assign current sender
 		val session = sender
 		val sessionTarget = nextTarget
 		try { 
 		  	mapper match {
 		  		// post request to childs
-		  		case None => (childs ? DelegateRequest(vf, session, sessionTarget)) onSuccess{
-		  			case reqFuture:Future[Any] => {
-		  				addProcess(reqFuture.mapTo[Boolean])
-
-						reqFuture onComplete {
-							case Success(data) => removeProcess(reqFuture.mapTo[Boolean])
-							case Failure(err) => {
-								session ! Error(err)
-
-								removeProcess(reqFuture.mapTo[Boolean])
-							}
-						}
-		  			}
-		  		}
+		  		case None => childs ! DelegateRequest(vf, session, sessionTarget)
 
 		  		// do the work by itself
 		  		case Some(mapperInstance) => {
-		  			mapperInstance.map(vf, (out, err) => {
-						if(err != null) {
-							session ! Error(err)
-						} else if(out != null) {
-							sessionTarget match {
-								case None => session ! Response(out)
-								case Some(target) => target.tell(Request(out), session)
-							}
-						} else {
-							//session ! None
+		  			mapperInstance.map(vf) {
+		  				case output:VirtualFile => sessionTarget match {
+							case None => session ! Response(output)
+							case Some(target) => target.tell(Request(output), session)
 						}
-					})
-
-					//Promise.successful(true).future
+						
+						case throwable:Throwable => session ! Error(throwable)
+		  			}
 		  		}
 		  	}
 		} catch {
@@ -142,8 +106,10 @@ class CommonReactiveWorker extends AbstractReactiveWorker
 	def reset(eofOrigin:Boolean) = {
 		mapper match {
 			case None => {
+				childs ! EOF()
 				// wait to stop all children
-				Await.ready(gracefulStop(childs, 5 minutes), 5 minutes)
+				//Await.ready(gracefulStop(childs, 5 minutes), 5 minutes)
+				Await.ready(terminatePromise.future, Duration.Inf)
 
 				childs = ActorRef.noSender
 			}
@@ -163,14 +129,14 @@ class CommonReactiveWorker extends AbstractReactiveWorker
 
 		// reset mapper and next target
 		nextTarget = Option.empty[ActorSelection]
+		terminatePromise = Promise[Boolean]()
 	}
 
 	def setup(mapperProps:ClassProps[_ <: Mapper], nextTarget:Option[ActorSelection], num:Int) = {
 		// setup childs router
-		//this.childs = this.context.actorOf(BalancingPool(num).props(Props(classOf[CommonReactiveWorker.SlaveWorker], mapper).withMailbox("prio-mailbox").withDispatcher("worker-pinned-dispatcher")), "slave")
-
 		if(num > 1) {
-			this.childs = this.context.actorOf(Props(classOf[CommonReactiveWorker.SmallestMailboxRouter], num, mapperProps).withMailbox("prio-mailbox").withDispatcher("worker-pinned-dispatcher"), "slave")
+			//this.childs = this.context.actorOf(Props(classOf[CommonReactiveWorker.SmallestMailboxRouter], num, mapperProps).withMailbox("prio-mailbox").withDispatcher("worker-pinned-dispatcher"), "slave")
+			this.childs = this.context.actorOf(Props(classOf[CommonReactiveWorker.SmallestMailboxRouter], num, mapperProps, terminatePromise).withMailbox("rura.akka.mailbox.bounded-priority").withDispatcher("rura.akka.dispatcher.threadpool.worker"), "slave")
 		} else {
 			this.mapper = Some(mapperProps.get())
 		}
@@ -183,7 +149,7 @@ class CommonReactiveWorker extends AbstractReactiveWorker
 
 object CommonReactiveWorker
 {
-	import ReactiveStream.{Request, DelegateRequest, Response, Error}
+	import ReactiveStream.{Request, DelegateRequest, Response, Error, EOF}
 
 	final class SlaveWorker(mapperProps:ClassProps[_ <: Mapper]) extends Actor with ActorLogging 
 	{
@@ -205,41 +171,39 @@ object CommonReactiveWorker
 			case DelegateRequest(vf, session, nextTarget) => {
 				//log.debug("got message {}", vf.name)
 
-				val promise = Promise[Boolean]()
+				//val promise = Promise[Boolean]()
 
-				sender ! promise.future
+				//sender ! promise.future
 
 				try { 
-					mapper.map(vf, (out, err) => {
-						if(err != null) {
-							err match {
-								case e: ReactiveException => session ! Error(err)
-								case e: Exception => session ! Error(new ReactiveException(vf, e))
-							}
-						} else if(out != null) {
-							nextTarget match {
-								case None => session ! Response(out)
-								case Some(target) => target.tell(Request(out), session)
-							}
-						} else {
-							//session ! None
+					mapper.map(vf){
+						case output:VirtualFile => nextTarget match {
+							case None => session ! Response(output)
+							case Some(target) => target.tell(Request(output), session)
 						}
-					})
 
-					promise success true
+						case throwable:ReactiveException => session ! Error(throwable)
+						
+						case throwable:Throwable => session ! Error(new ReactiveException(vf, throwable))
+					}
+
+					//promise success true
 				} catch {
-					case e: ReactiveException => promise failure e
-				  	case e: Exception => promise failure new ReactiveException(vf, e)
+					case e: ReactiveException => session ! Error(e) //promise failure e
+				  	case e: Exception => session ! Error(new ReactiveException(vf, e)) //promise failure new ReactiveException(vf, e)
 				}
 			}
+
+			case EOF() => self ! PoisonPill
 		}
 	}
 
-	final class SmallestMailboxRouter(num:Int, mapperProps:ClassProps[_ <: Mapper]) extends Actor with ActorLogging
+	final class SmallestMailboxRouter(num:Int, mapperProps:ClassProps[_ <: Mapper], terminatePromise:Promise[Boolean]) extends Actor with ActorLogging
 	{
 		private var router = {
 			val routees = for(i <- 1 to num) yield {
-				val tmp = this.context.actorOf(Props(classOf[CommonReactiveWorker.SlaveWorker], mapperProps).withMailbox("prio-mailbox").withDispatcher("worker-pinned-dispatcher"), s"$i")
+				//val tmp = this.context.actorOf(Props(classOf[CommonReactiveWorker.SlaveWorker], mapperProps).withMailbox("prio-mailbox").withDispatcher("worker-pinned-dispatcher"), s"$i")
+				val tmp = this.context.actorOf(Props(classOf[CommonReactiveWorker.SlaveWorker], mapperProps).withMailbox("rura.akka.mailbox.bounded-priority").withDispatcher("rura.akka.dispatcher.threadpool.worker"), s"$i")
 				// watch routee lifecycle
 				this.context watch tmp
 
@@ -260,8 +224,12 @@ object CommonReactiveWorker
 				// stop itself where there are no routees
 				if(router.routees.size == 0) {
 					self ! PoisonPill
+
+					terminatePromise success true
 				}
 			}
+
+			case EOF() => router.route(Broadcast(EOF()), ActorRef.noSender)
 
 			case otherwise => router.route(otherwise, sender)
 		}

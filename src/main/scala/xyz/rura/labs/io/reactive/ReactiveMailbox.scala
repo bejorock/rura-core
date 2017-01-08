@@ -46,4 +46,4 @@ class BoundedReactiveMailbox(settings:ActorSystem.Settings, config:Config) exten
 
 	// mid priority
 	case otherwise => 3
-}, 100, 5 minutes)
+}, config.getInt("mailbox-capacity"), Duration(config.getString("mailbox-push-timeout-time")))

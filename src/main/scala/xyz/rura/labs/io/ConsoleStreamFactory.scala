@@ -39,7 +39,7 @@ object ConsoleStreamFactory
 	def dest(implicit o:Option[OutputStream] = None):ClassProps[Mapper] = ClassProps(classOf[ConsoleStreamFactory.Dest], o)
 
 	final class Dest(out:Option[OutputStream]) extends AbstractMapper {
-		def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = {
+		def map(f:VirtualFile, output:MapperOutput):Unit = {
 			Console.withOut(out.getOrElse(Console.out)) {
 				println("file: " + f.name)
 				println("path: " + f.path)
@@ -47,8 +47,8 @@ object ConsoleStreamFactory
 				println("contents: " + IOUtils.toString(f.inputstream))
 			}
 
-			// must call callback
-			callback(f, null)
+			// should not return anything
+			output.collect(f)
 		}
 	}
 }

@@ -56,8 +56,8 @@ class FileStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) w
 		}
 
 		"append content" in {
-			val factory = FileStreamFactory.src("tmp/src/*.json").pipe{(vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => 
-				callback(VirtualFile(vf.name, vf.path, vf.encoding, IOUtils.toInputStream("{\"name\":\"rana loda lubis\"}")), null)
+			val factory = FileStreamFactory.src("tmp/src/*.json").pipe(){
+				case (vf, output) => output.collect(VirtualFile(vf.name, vf.path, vf.encoding, IOUtils.toInputStream("{\"name\":\"rana loda lubis\"}")))
 			}
 
 			val stream = Await.result(factory.toStream, Duration.Inf) 
@@ -101,9 +101,9 @@ class FileStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSystem) w
 		}
 
 		"write output to {destination}" in {
-			val factory = FileStreamFactory.src("tmp/src/*.json").pipe((vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => {
-				callback(VirtualFile(vf.name, vf.path, vf.encoding, IOUtils.toInputStream("{\"name\":\"rana loda lubis\"}")), null)
-			}).pipe(FileStreamFactory.dest("tmp/dest/"))
+			val factory = FileStreamFactory.src("tmp/src/*.json").pipe(){
+				case (vf, output) => output.collect(VirtualFile(vf.name, vf.path, vf.encoding, IOUtils.toInputStream("{\"name\":\"rana loda lubis\"}")))
+			}.pipe(FileStreamFactory.dest("tmp/dest/"))
 
 			val stream = Await.result(factory.toStream, Duration.Inf) 
 

@@ -68,27 +68,47 @@ class ReactiveStreamSpec(_system:ActorSystem) extends TestKit(_system:ActorSyste
     		val startTime = java.lang.System.currentTimeMillis()
 
     		// create stream
-			val streamFuture = new ReactiveStream(dummyData).pipe((vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => {
-				for(i <- 1 to 5) {
+			val streamFuture = new ReactiveStream(dummyData).pipe("step1"){
+				case (vf, output) => {
 					//factorial(1000)
-					callback(VirtualFile(vf.name + "-xoxo", vf.path, vf.encoding, vf.inputstream), null)
+					for(i <- 1 to 5) {
+						//factorial(1000)
+						output.collect(VirtualFile(vf.name + "-xoxo", vf.path, vf.encoding, vf.inputstream))
+					}
+
+					//Thread.sleep(100)
 				}
-			}, 1, "step1").pipe((vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => {
-				for(i <- 1 to 10) {
-					//factorial(1000)
-					callback(VirtualFile(vf.name + "-xdxd", vf.path, vf.encoding, vf.inputstream), null)
+			}.pipe(5, "step2"){
+				case (vf, output) => {
+					//factorial(2000)
+					for(i <- 1 to 10) {
+						//factorial(1000)
+						output.collect(VirtualFile(vf.name + "-xdxd", vf.path, vf.encoding, vf.inputstream))
+					}
+
+					Thread.sleep(10)
 				}
-			}, 5, "step2").pipe((vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => {
-				for(i <- 1 to 10) {
-					//factorial(1000)
-					callback(VirtualFile(vf.name + "-yoyo", vf.path, vf.encoding, vf.inputstream), null)
+			}.pipe(10, "step3"){
+				case (vf, output) => {
+					//factorial(3000)
+					for(i <- 1 to 10) {
+						//factorial(1000)
+						output.collect(VirtualFile(vf.name + "-yoyo", vf.path, vf.encoding, vf.inputstream))
+					}
+
+					Thread.sleep(50)
 				}
-			}, 10, "step3").pipe((vf:VirtualFile, callback:(VirtualFile, Exception) => Unit) => {
-				for(i <- 1 to 10) {
-					//factorial(1000)
-					callback(VirtualFile(vf.name + "-wkwk", vf.path, vf.encoding, vf.inputstream), null)
+			}.pipe(15, "step4"){
+				case (vf, output) => {
+					//factorial(4000)
+					for(i <- 1 to 10) {
+						//factorial(1000)
+						output.collect(VirtualFile(vf.name + "-wkwk", vf.path, vf.encoding, vf.inputstream))
+					}
+
+					Thread.sleep(100)
 				}
-			}, 15, "step4").toStream
+			}.toStream
 
 			val stream = Await.result(streamFuture, Duration.Inf).nonBlocking
 

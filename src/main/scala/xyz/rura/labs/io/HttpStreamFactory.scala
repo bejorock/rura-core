@@ -79,7 +79,8 @@ object HttpStreamFactory
 	def src(url:String)(implicit system:ActorSystem):ReactiveStream = src(Array(url))
 
 	def watch(url:String, _client:HttpClient, duration:Duration, interval:Int)(implicit system:ActorSystem):ReactiveStream = {
-		import system.dispatcher
+		//import system.dispatcher
+		implicit val ec = system.dispatchers.lookup("rura.akka.dispatcher.threadpool.simple")
 
 		// create input
 		val input = new Iterable[VirtualFile]() {
@@ -146,18 +147,14 @@ object HttpStreamFactory
 	def dest(url:String):ClassProps[Mapper] = dest(url, HttpClients.createDefault())
 
 	final class Dest(url:String, client:HttpClient) extends AbstractMapper {
-		def map(f:VirtualFile, callback:(VirtualFile, Exception) => Unit):Unit = {
+		def map(f:VirtualFile, output:MapperOutput):Unit = {
 			val post = new HttpPost(url)
 			post.setEntity(new ByteArrayEntity(IOUtils.toByteArray(f.inputstream)))
 
 			val resp = client.execute(post)
 
 			if(resp.getStatusLine().getStatusCode() != 200) {
-				//throw new Exception("failed to execute http request, return " + resp.getStatusLine().getStatusCode())
-
-				callback(null, new Exception("failed to execute http request, return " + resp.getStatusLine().getStatusCode()))
-			} else {
-				callback(null, null)
+				output.collect(new Exception("failed to execute http request, return " + resp.getStatusLine().getStatusCode()))
 			}
 		}
 	}
