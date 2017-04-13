@@ -1,9 +1,10 @@
 pipeline {
   agent any
   stages {
-    stage('error') {
+    stage('Print Message') {
       steps {
         echo 'Hello World'
+        sh 'echo "hello world"'
       }
     }
   }
