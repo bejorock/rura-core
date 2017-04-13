@@ -1,9 +1,9 @@
 pipeline {
   agent any
   stages {
-    stage('') {
+    stage('error') {
       steps {
-        mail(subject: 'New Commit', body: 'There is new commit')
+        echo 'Hello World'
       }
     }
   }
