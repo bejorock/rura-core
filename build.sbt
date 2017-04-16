@@ -13,13 +13,13 @@ libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play-json" % "2.5.0",
   "commons-io" % "commons-io" % "2.4",
   "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0",
-  "com.typesafe.akka" %% "akka-actor" % "2.4.6",
-  "com.typesafe.akka" %% "akka-testkit" % "2.4.6",
-  "com.typesafe.akka" %% "akka-slf4j" % "2.4.6",
-  "io.kamon" %% "kamon-core" % "0.6.0",
-  "io.kamon" %% "kamon-statsd" % "0.6.0",
-  "io.kamon" %% "kamon-akka" % "0.6.0",
-  "io.kamon" %% "kamon-akka-remote" % "0.6.0",
+  "com.typesafe.akka" %% "akka-actor" % "2.4.16",
+  "com.typesafe.akka" %% "akka-testkit" % "2.4.16",
+  "com.typesafe.akka" %% "akka-slf4j" % "2.4.16",
+  "io.kamon" %% "kamon-core" % "0.6.3",
+  "io.kamon" %% "kamon-statsd" % "0.6.3",
+  "io.kamon" %% "kamon-akka" % "0.6.3",
+  "io.kamon" %% "kamon-akka-remote_akka-2.4" % "0.6.3",
   //"io.kamon" %% "kamon-log-reporter" % "0.6.0",
   //"io.kamon" %% "kamon-system-metrics" % "0.6.0",
   //"org.slf4j" % "slf4j-nop" % "1.7.21",
@@ -29,3 +29,10 @@ libraryDependencies ++= Seq(
 scalacOptions in Compile := Vector("-Ywarn-infer-any", "-Ywarn-unused-import")
 
 publishTo := Some(Resolver.file("ranalubis-dropbox", new File(Path.userHome.absolutePath+"/Dropbox/M2")))
+
+aspectjSettings
+
+javaOptions <++= AspectjKeys.weaverOptions in Aspectj
+
+// when you call "sbt run" aspectj weaving kicks in
+fork in run := true

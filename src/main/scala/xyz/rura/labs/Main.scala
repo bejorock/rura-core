@@ -129,9 +129,17 @@ object Main
 		}
 
 		stream onComplete{
-			system.shutdown()
+			system.terminate()
 
 			Kamon.shutdown()
 		}
+
+		Runtime.getRuntime.addShutdownHook(new Thread(new Runnable {
+			override def run() = {
+				system.terminate()
+
+				Kamon.shutdown()
+			}
+		}))
 	}
 }
